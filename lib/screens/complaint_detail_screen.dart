@@ -18,6 +18,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
   Complaint? _complaint;
   List<StatusHistory> _history = [];
   List<ComplaintMedia> _media = [];
+  List<Authority> _autoridades = [];
   bool _loading = true;
   String? _error;
 
@@ -56,12 +57,14 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
         api.complaintById(widget.complaintId),
         api.complaintHistory(widget.complaintId),
         api.complaintMedia(widget.complaintId),
+        authorities(),
       ]);
       if (!mounted) return;
       setState(() {
         _complaint = results[0] as Complaint?;
         _history = results[1] as List<StatusHistory>;
         _media = results[2] as List<ComplaintMedia>;
+        _autoridades = results[3] as List<Authority>;
         _loading = false;
       });
     } catch (e) {
@@ -119,6 +122,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
           if (_media.isNotEmpty) ..._buildMediaSection(),
           const Divider(height: 32),
           _InfoRow(label: 'Categoría', detail: _categoryLabel(complaint.categoryId)),
+          _InfoRow(label: 'Entidad asignada', detail: _authorityLabel(complaint.autoridadId)),
           if (complaint.address != null && complaint.address!.isNotEmpty)
             _InfoRow(label: 'Ubicación', detail: complaint.address!),
           if (complaint.latitude != null && complaint.longitude != null)
@@ -146,6 +150,8 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
   }
 
   String _categoryLabel(String? id) => categoryNameFromCache(id);
+
+  String _authorityLabel(String? id) => authorityNameOf(_autoridades, id);
 
   List<Widget> _buildMediaSection() {
     return [

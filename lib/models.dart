@@ -33,11 +33,39 @@ class Category {
       );
 }
 
+class Authority {
+  Authority({
+    required this.id,
+    required this.nombre,
+    required this.sigla,
+    required this.tipo,
+    this.descripcion,
+    required this.isActive,
+  });
+
+  final String id;
+  final String nombre;
+  final String sigla;
+  final String tipo;
+  final String? descripcion;
+  final bool isActive;
+
+  factory Authority.fromJson(Map<String, dynamic> json) => Authority(
+        id: json['id'].toString(),
+        nombre: _str(json, 'nombre'),
+        sigla: _str(json, 'sigla'),
+        tipo: _str(json, 'tipo'),
+        descripcion: json['descripcion'] as String?,
+        isActive: json['is_active'] == true,
+      );
+}
+
 class Complaint {
   Complaint({
     required this.id,
     required this.userId,
     this.categoryId,
+    this.autoridadId,
     required this.title,
     required this.description,
     this.address,
@@ -52,6 +80,7 @@ class Complaint {
   final String id;
   final String userId;
   final String? categoryId;
+  final String? autoridadId;
   final String title;
   final String description;
   final String? address;
@@ -69,6 +98,7 @@ class Complaint {
       id: json['id'].toString(),
       userId: json['user_id'].toString(),
       categoryId: json['category_id']?.toString(),
+      autoridadId: json['autoridad_id']?.toString(),
       title: _str(json, 'title'),
       description: _str(json, 'description'),
       address: json['address'] as String?,
