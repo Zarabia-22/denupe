@@ -24,6 +24,40 @@ void main() {
       expect(complaint.categoryId, 'cat-1');
       expect(complaint.latitude, -12.123456);
       expect(complaint.status, 'recibida');
+      expect(complaint.autoridadId, isNull);
+    });
+
+    test('Complaint.fromJson parsea autoridad_id', () {
+      final complaint = Complaint.fromJson({
+        'id': 'c1',
+        'user_id': 'u1',
+        'category_id': 'cat-1',
+        'autoridad_id': 'aut-1',
+        'title': 'Título',
+        'description': 'Descripción',
+        'status': 'recibida',
+        'priority': 'media',
+        'created_at': '2026-10-07T10:00:00Z',
+        'updated_at': '2026-10-07T10:00:00Z',
+      });
+
+      expect(complaint.autoridadId, 'aut-1');
+    });
+
+    test('Authority.fromJson parsea las entidades receptoras', () {
+      final authority = Authority.fromJson({
+        'id': 'aut-1',
+        'nombre': 'Municipalidad del Distrito',
+        'sigla': 'MUN',
+        'tipo': 'municipalidad',
+        'descripcion': 'Servicios municipales',
+        'is_active': true,
+      });
+
+      expect(authority.nombre, 'Municipalidad del Distrito');
+      expect(authority.sigla, 'MUN');
+      expect(authority.tipo, 'municipalidad');
+      expect(authority.isActive, isTrue);
     });
 
     test('AppNotification.fromJson parsea is_read y fecha', () {

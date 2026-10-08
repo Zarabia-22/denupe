@@ -36,6 +36,32 @@ String categoryNameFromCache(String? id) {
   return categoryNameOf(list, id);
 }
 
+List<Authority>? _authoritiesCache;
+
+/// Entidades receptoras, cacheadas la primera vez (se cargan en el backend).
+Future<List<Authority>> authorities() async {
+  final cached = _authoritiesCache;
+  if (cached != null) return cached;
+  final value = await api.authorities();
+  _authoritiesCache = value;
+  return value;
+}
+
+String authorityNameOf(List<Authority> list, String? id) {
+  if (id == null) return 'Por asignar';
+  for (final a in list) {
+    if (a.id == id) return a.nombre;
+  }
+  return 'Por asignar';
+}
+
+/// Nombre de la entidad desde el caché global (si ya se cargó).
+String authorityNameFromCache(String? id) {
+  final list = _authoritiesCache;
+  if (list == null || id == null) return 'Por asignar';
+  return authorityNameOf(list, id);
+}
+
 /// Contador que se incrementa cada vez que cambian las notificaciones
 /// (evento realtime, lectura, etc.) para que la pantalla se refresque.
 final ValueNotifier<int> notificationsTick = ValueNotifier<int>(0);

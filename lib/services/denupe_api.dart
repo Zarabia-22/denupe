@@ -40,20 +40,32 @@ class DenupeApi {
 
   Future<List<Category>> categories() async {
     final rows = await _client.database
-        .from('categories')
+        .from('categorias')
         .select('id,code,name,description')
         .order('sort_order')
         .execute();
     return rows.map(Category.fromJson).toList();
   }
 
+  // ------------------------------------------------------------- authorities
+
+  Future<List<Authority>> authorities() async {
+    final rows = await _client.database
+        .from('autoridades')
+        .select('id,nombre,sigla,tipo,descripcion,is_active')
+        .eq('is_active', true)
+        .order('nombre')
+        .execute();
+    return rows.map(Authority.fromJson).toList();
+  }
+
   // -------------------------------------------------------------- complaints
 
   Future<List<Complaint>> myComplaints() async {
     final rows = await _client.database
-        .from('complaints')
+        .from('denuncias')
         .select(
-            'id,user_id,category_id,title,description,address,latitude,longitude,status,priority,created_at,updated_at')
+            'id,user_id,category_id,autoridad_id,title,description,address,latitude,longitude,status,priority,created_at,updated_at')
         .order('created_at', ascending: false)
         .execute();
     return rows.map(Complaint.fromJson).toList();
@@ -69,7 +81,7 @@ class DenupeApi {
   }) async {
     final userId = _client.auth.currentUser!.id;
     final rows = await _client.database
-        .from('complaints')
+        .from('denuncias')
         .insert({
           'user_id': userId,
           'category_id': categoryId,
@@ -89,7 +101,7 @@ class DenupeApi {
 
   Future<List<StatusHistory>> complaintHistory(String complaintId) async {
     final rows = await _client.database
-        .from('complaint_status_history')
+        .from('historial_estados')
         .select('id,complaint_id,status,note,created_at')
         .eq('complaint_id', complaintId)
         .order('created_at')
@@ -99,9 +111,9 @@ class DenupeApi {
 
   Future<Complaint?> complaintById(String id) async {
     final rows = await _client.database
-        .from('complaints')
+        .from('denuncias')
         .select(
-            'id,user_id,category_id,title,description,address,latitude,longitude,status,priority,created_at,updated_at')
+            'id,user_id,category_id,autoridad_id,title,description,address,latitude,longitude,status,priority,created_at,updated_at')
         .eq('id', id)
         .execute();
     if (rows.isEmpty) return null;
@@ -114,7 +126,7 @@ class DenupeApi {
 
   Future<List<ComplaintMedia>> complaintMedia(String complaintId) async {
     final rows = await _client.database
-        .from('complaint_media')
+        .from('adjuntos_denuncia')
         .select('id,complaint_id,user_id,storage_key,url,media_type,mime_type,created_at')
         .eq('complaint_id', complaintId)
         .order('created_at', ascending: true)
@@ -136,7 +148,7 @@ class DenupeApi {
         .from(_mediaBucket)
         .upload(key, bytes, contentType: contentType);
     final rows = await _client.database
-        .from('complaint_media')
+        .from('adjuntos_denuncia')
         .insert({
           'complaint_id': complaintId,
           'user_id': userId,
@@ -165,7 +177,7 @@ class DenupeApi {
   Future<void> deleteComplaintMedia(ComplaintMedia media) async {
     await _client.storage.from(_mediaBucket).delete(media.storageKey);
     await _client.database
-        .from('complaint_media')
+        .from('adjuntos_denuncia')
         .eq('id', media.id)
         .delete()
         .execute();
@@ -180,7 +192,7 @@ class DenupeApi {
 
   Future<List<AppNotification>> notifications() async {
     final rows = await _client.database
-        .from('notifications')
+        .from('notificaciones')
         .select('id,user_id,complaint_id,title,body,is_read,created_at')
         .order('created_at', ascending: false)
         .execute();
@@ -189,7 +201,7 @@ class DenupeApi {
 
   Future<void> markNotificationRead(String id) async {
     await _client.database
-        .from('notifications')
+        .from('notificaciones')
         .eq('id', id)
         .update({'is_read': true})
         .execute();
