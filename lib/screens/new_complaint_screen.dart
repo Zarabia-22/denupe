@@ -105,6 +105,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
         latitude: _latitude,
         longitude: _longitude,
       );
+      bumpNotificationsTick();
       if (!mounted) return;
       _showMessage('Denuncia enviada. ¡Gracias por reportar!');
       _title.clear();
