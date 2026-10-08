@@ -45,5 +45,35 @@ void main() {
       expect(statusLabel('en_revision'), 'En revisión');
       expect(statusLabel('desconocido'), 'desconocido');
     });
+
+    test('ComplaintMedia.fromJson parsea adjuntos y detecta tipo', () {
+      final media = ComplaintMedia.fromJson({
+        'id': 'm1',
+        'complaint_id': 'c1',
+        'user_id': 'u1',
+        'storage_key': 'complaints/c1/foto.png',
+        'url': 'https://example.com/foto.png',
+        'media_type': 'image',
+        'mime_type': 'image/png',
+        'created_at': '2026-10-07T12:00:00Z',
+      });
+
+      expect(media.isImage, isTrue);
+      expect(media.storageKey, 'complaints/c1/foto.png');
+      expect(media.mimeType, 'image/png');
+
+      final video = ComplaintMedia.fromJson({
+        'id': 'm2',
+        'complaint_id': 'c1',
+        'user_id': 'u1',
+        'storage_key': 'complaints/c1/video.mp4',
+        'url': 'https://example.com/video.mp4',
+        'media_type': 'video',
+        'mime_type': 'video/mp4',
+        'created_at': '2026-10-07T12:00:00Z',
+      });
+
+      expect(video.isImage, isFalse);
+    });
   });
 }
