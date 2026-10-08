@@ -14,6 +14,7 @@ class MisDenunciasScreen extends StatefulWidget {
 class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
   List<Complaint> _complaints = [];
   List<Category> _cats = [];
+  List<Authority> _autoridades = [];
   bool _loading = true;
   String? _error;
 
@@ -32,11 +33,13 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
       final results = await Future.wait([
         api.myComplaints(),
         categories(),
+        authorities(),
       ]);
       if (!mounted) return;
       setState(() {
         _complaints = results[0] as List<Complaint>;
         _cats = results[1] as List<Category>;
+        _autoridades = results[2] as List<Authority>;
         _loading = false;
       });
     } catch (e) {
@@ -89,6 +92,7 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
           return _ComplaintCard(
             complaint: item,
             categoryName: categoryNameOf(_cats, item.categoryId),
+            authorityName: authorityNameOf(_autoridades, item.autoridadId),
             onTap: () => _openDetail(item),
           );
         },
@@ -101,11 +105,13 @@ class _ComplaintCard extends StatelessWidget {
   const _ComplaintCard({
     required this.complaint,
     required this.categoryName,
+    required this.authorityName,
     required this.onTap,
   });
 
   final Complaint complaint;
   final String categoryName;
+  final String authorityName;
   final VoidCallback onTap;
 
   @override
@@ -139,6 +145,22 @@ class _ComplaintCard extends StatelessWidget {
               Text(
                 categoryName,
                 style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 2),
+              Row(
+                children: [
+                  Icon(Icons.account_balance_outlined,
+                      size: 14, color: Colors.grey.shade600),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      authorityName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 4),
               Text(
