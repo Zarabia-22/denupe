@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../models.dart';
 import '../services/app_scope.dart';
@@ -16,6 +17,7 @@ class ComplaintDetailScreen extends StatefulWidget {
 class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
   Complaint? _complaint;
   List<StatusHistory> _history = [];
+  List<ComplaintMedia> _media = [];
   bool _loading = true;
   String? _error;
 
@@ -53,11 +55,13 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
       final results = await Future.wait([
         api.complaintById(widget.complaintId),
         api.complaintHistory(widget.complaintId),
+        api.complaintMedia(widget.complaintId),
       ]);
       if (!mounted) return;
       setState(() {
         _complaint = results[0] as Complaint?;
         _history = results[1] as List<StatusHistory>;
+        _media = results[2] as List<ComplaintMedia>;
         _loading = false;
       });
     } catch (e) {
@@ -112,6 +116,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
           ),
           const SizedBox(height: 8),
           Text(complaint.description, style: const TextStyle(fontSize: 15)),
+          if (_media.isNotEmpty) ..._buildMediaSection(),
           const Divider(height: 32),
           _InfoRow(label: 'Categoría', detail: _categoryLabel(complaint.categoryId)),
           if (complaint.address != null && complaint.address!.isNotEmpty)
@@ -141,6 +146,60 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
   }
 
   String _categoryLabel(String? id) => categoryNameFromCache(id);
+
+  List<Widget> _buildMediaSection() {
+    return [
+      const SizedBox(height: 16),
+      Text('Evidencias', style: Theme.of(context).textTheme.titleMedium),
+      const SizedBox(height: 8),
+      SizedBox(
+        height: 110,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          itemCount: _media.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final item = _media[index];
+            return _MediaTile(
+              media: item,
+              onDelete: () => _confirmDeleteMedia(item),
+            );
+          },
+        ),
+      ),
+      const SizedBox(height: 8),
+    ];
+  }
+
+  Future<void> _confirmDeleteMedia(ComplaintMedia media) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Eliminar adjunto'),
+        content: const Text('¿Seguro que quieres eliminar este adjunto?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Eliminar'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await api.deleteComplaintMedia(media);
+      _load();
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo eliminar el adjunto')),
+      );
+    }
+  }
 }
 
 String _fmt(DateTime d) => '${d.day}/${d.month}/${d.year} ${d.hour}:${d.minute.toString().padLeft(2, '0')}';
@@ -175,6 +234,177 @@ class _StatusBanner extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _MediaTile extends StatefulWidget {
+  const _MediaTile({required this.media, this.onDelete});
+
+  final ComplaintMedia media;
+  final VoidCallback? onDelete;
+
+  @override
+  State<_MediaTile> createState() => _MediaTileState();
+}
+
+class _MediaTileState extends State<_MediaTile> {
+  String? _url;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSignedUrl();
+  }
+
+  Future<void> _loadSignedUrl() async {
+    setState(() => _url = null);
+    try {
+      final url = await api.complaintMediaSignedUrl(widget.media.storageKey);
+      if (!mounted) return;
+      setState(() => _url = url);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _failed = true);
+    }
+  }
+
+  Future<void> _openVideo() async {
+    final url = _url;
+    if (url == null) return;
+    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+  }
+
+  void _openImage() {
+    final url = _url;
+    if (url == null) return;
+    showDialog<void>(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.black,
+        child: InteractiveViewer(
+          child: Image.network(
+            url,
+            fit: BoxFit.contain,
+            loadingBuilder: (context, child, progress) => progress == null
+                ? child
+                : const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  ),
+            errorBuilder: (_, _, _) => const Icon(
+              Icons.broken_image_outlined,
+              color: Colors.white54,
+              size: 48,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget preview;
+    if (_failed) {
+      preview = Container(
+        width: 120,
+        height: 96,
+        color: Colors.grey.shade200,
+        child: const Icon(Icons.broken_image_outlined),
+      );
+    } else if (widget.media.isImage) {
+      final url = _url;
+      preview = GestureDetector(
+        onTap: url == null ? null : _openImage,
+        child: Container(
+          width: 120,
+          height: 96,
+          color: Colors.grey.shade200,
+          child: url == null
+              ? const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Image.network(
+                  url,
+                  width: 120,
+                  height: 96,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, _, _) => const Icon(
+                    Icons.broken_image_outlined,
+                  ),
+                ),
+        ),
+      );
+    } else {
+      preview = GestureDetector(
+        onTap: _url == null ? null : _openVideo,
+        child: Container(
+          width: 120,
+          height: 96,
+          color: Colors.black87,
+          child: Center(
+            child: _url == null
+                ? const CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  )
+                : const Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.play_circle_fill,
+                          color: Colors.white, size: 36),
+                      SizedBox(height: 2),
+                      Icon(Icons.videocam, color: Colors.white54, size: 14),
+                    ],
+                  ),
+          ),
+        ),
+      );
+    }
+    return SizedBox(
+      width: 120,
+      child: Column(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Stack(
+              children: [
+                preview,
+                if (widget.onDelete != null)
+                  Positioned(
+                    top: 4,
+                    right: 4,
+                    child: InkWell(
+                      onTap: () => _delete(),
+                      child: Container(
+                        padding: const EdgeInsets.all(2),
+                        decoration: const BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
+                        ),
+                        child:
+                            const Icon(Icons.close, color: Colors.white, size: 16),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            widget.media.isImage ? 'Imagen' : 'Video',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _delete() async {
+    final callback = widget.onDelete;
+    if (callback != null) callback();
   }
 }
 

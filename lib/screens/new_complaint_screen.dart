@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:insforge_flutter/insforge_flutter.dart';
 
 import '../models.dart';
@@ -15,10 +18,14 @@ class NuevaDenunciaScreen extends StatefulWidget {
 }
 
 class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
+  static const int _maxMedia = 5;
+  static const int _maxMediaBytes = 50 * 1024 * 1024;
+
   final _formKey = GlobalKey<FormState>();
   final _title = TextEditingController();
   final _description = TextEditingController();
   final _address = TextEditingController();
+  final _picker = ImagePicker();
   String? _categoryId;
   String? _error;
   bool _loading = false;
@@ -26,6 +33,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
   double? _latitude;
   double? _longitude;
   List<Category> _cats = [];
+  final List<_PendingMedia> _media = [];
 
   @override
   void initState() {
@@ -89,6 +97,49 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
     }
   }
 
+  Future<void> _pickImage() async {
+    final file = await _picker.pickImage(
+      source: ImageSource.gallery,
+      maxWidth: 2048,
+      imageQuality: 85,
+    );
+    await _addMedia(file, 'image');
+  }
+
+  Future<void> _pickVideo() async {
+    final file = await _picker.pickVideo(source: ImageSource.gallery);
+    await _addMedia(file, 'video');
+  }
+
+  Future<void> _addMedia(XFile? file, String mediaType) async {
+    if (file == null || !mounted) return;
+    if (_media.length >= _maxMedia) {
+      _showMessage('Máximo $_maxMedia adjuntos por denuncia');
+      return;
+    }
+    try {
+      final bytes = await file.readAsBytes();
+      if (bytes.length > _maxMediaBytes) {
+        _showMessage('El archivo supera el límite de 50 MB');
+        return;
+      }
+      setState(() {
+        _media.add(_PendingMedia(
+          xfile: file,
+          mediaType: mediaType,
+          bytes: bytes,
+          contentType: _mimeFromName(file.name, mediaType),
+        ));
+      });
+    } catch (_) {
+      _showMessage('No se pudo leer el archivo seleccionado');
+    }
+  }
+
+  void _removeMedia(int index) {
+    setState(() => _media.removeAt(index));
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     if (_categoryId == null) {
@@ -97,7 +148,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
     }
     setState(() => _submitting = true);
     try {
-      await api.createComplaint(
+      final complaint = await api.createComplaint(
         categoryId: _categoryId!,
         title: _title.text.trim(),
         description: _description.text.trim(),
@@ -106,6 +157,23 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
         longitude: _longitude,
       );
       bumpNotificationsTick();
+      final pending = List<_PendingMedia>.of(_media);
+      _media.clear();
+      if (mounted) setState(() {});
+      for (final item in pending) {
+        try {
+          await api.uploadComplaintMedia(
+            complaintId: complaint.id,
+            bytes: item.bytes,
+            filename: item.xfile.name,
+            contentType: item.contentType,
+            mediaType: item.mediaType,
+          );
+        } catch (_) {
+          if (!mounted) return;
+          _showMessage('"${item.xfile.name}" no se pudo adjuntar');
+        }
+      }
       if (!mounted) return;
       _showMessage('Denuncia enviada. ¡Gracias por reportar!');
       _title.clear();
@@ -130,6 +198,28 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
     ScaffoldMessenger.of(context)
       ..removeCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  List<Widget> _buildMediaRow() {
+    return [
+      SizedBox(
+        height: 88,
+        child: ListView.separated(
+          scrollDirection: Axis.horizontal,
+          shrinkWrap: true,
+          itemCount: _media.length,
+          separatorBuilder: (_, _) => const SizedBox(width: 8),
+          itemBuilder: (context, index) {
+            final item = _media[index];
+            return _PendingMediaTile(
+              media: item,
+              onRemove: () => _removeMedia(index),
+            );
+          },
+        ),
+      ),
+      const SizedBox(height: 8),
+    ];
   }
 
   @override
@@ -224,6 +314,33 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                     : const Text('Usar mi ubicación'),
               ),
               const SizedBox(height: 24),
+              Text('Adjuntos', style: Theme.of(context).textTheme.titleSmall),
+              const SizedBox(height: 4),
+              Text(
+                'Añade fotos o videos para describir mejor el problema.',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 8),
+              if (_media.isNotEmpty) ..._buildMediaRow(),
+              Row(
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: _pickImage,
+                    icon: const Icon(Icons.photo_camera_outlined),
+                    label: const Text('Foto'),
+                  ),
+                  const SizedBox(width: 8),
+                  OutlinedButton.icon(
+                    onPressed: _pickVideo,
+                    icon: const Icon(Icons.videocam_outlined),
+                    label: const Text('Video'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
               FilledButton.icon(
                 onPressed: _submitting ? null : _submit,
                 style: FilledButton.styleFrom(
@@ -244,4 +361,79 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
       ],
     );
   }
+}
+
+/// Archivo elegido que se subirá junto con la denuncia.
+class _PendingMedia {
+  _PendingMedia({
+    required this.xfile,
+    required this.mediaType,
+    required this.bytes,
+    required this.contentType,
+  });
+
+  final XFile xfile;
+  final String mediaType;
+  final Uint8List bytes;
+  final String contentType;
+}
+
+class _PendingMediaTile extends StatelessWidget {
+  const _PendingMediaTile({required this.media, required this.onRemove});
+
+  final _PendingMedia media;
+  final VoidCallback onRemove;
+
+  @override
+  Widget build(BuildContext context) {
+    final Widget preview = media.mediaType == 'image'
+        ? Image.memory(media.bytes, fit: BoxFit.cover, width: 96, height: 88)
+        : Container(
+            width: 96,
+            height: 88,
+            color: Colors.black87,
+            child: const Icon(Icons.videocam, color: Colors.white, size: 32),
+          );
+    return SizedBox(
+      width: 96,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: preview,
+          ),
+          Positioned(
+            top: 2,
+            right: 2,
+            child: InkWell(
+              onTap: onRemove,
+              child: Container(
+                padding: const EdgeInsets.all(2),
+                decoration: const BoxDecoration(
+                  color: Colors.black54,
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.close, color: Colors.white, size: 16),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+String _mimeFromName(String filename, String mediaType) {
+  final ext = filename.toLowerCase();
+  if (ext.endsWith('.png')) return 'image/png';
+  if (ext.endsWith('.gif')) return 'image/gif';
+  if (ext.endsWith('.webp')) return 'image/webp';
+  if (mediaType == 'image') return 'image/jpeg';
+  if (ext.endsWith('.mov')) return 'video/quicktime';
+  if (ext.endsWith('.webm')) return 'video/webm';
+  if (ext.endsWith('.3gp')) return 'video/3gpp';
+  if (ext.endsWith('.m4v')) return 'video/x-m4v';
+  if (ext.endsWith('.avi')) return 'video/x-msvideo';
+  return 'video/mp4';
 }
