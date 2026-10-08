@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:insforge_flutter/insforge_flutter.dart';
 
 import '../models.dart';
@@ -104,6 +106,74 @@ class DenupeApi {
         .execute();
     if (rows.isEmpty) return null;
     return Complaint.fromJson(rows.first);
+  }
+
+  // ------------------------------------------------------------ complaint media
+
+  static const String _mediaBucket = 'complaint-media';
+
+  Future<List<ComplaintMedia>> complaintMedia(String complaintId) async {
+    final rows = await _client.database
+        .from('complaint_media')
+        .select('id,complaint_id,user_id,storage_key,url,media_type,mime_type,created_at')
+        .eq('complaint_id', complaintId)
+        .order('created_at', ascending: true)
+        .execute();
+    return rows.map(ComplaintMedia.fromJson).toList();
+  }
+
+  /// Sube el archivo al bucket privado y registra la fila en complaint_media.
+  Future<ComplaintMedia> uploadComplaintMedia({
+    required String complaintId,
+    required Uint8List bytes,
+    required String filename,
+    required String contentType,
+    required String mediaType,
+  }) async {
+    final userId = _client.auth.currentUser!.id;
+    final key = 'complaints/$complaintId/${_uniqueMediaName(filename)}';
+    final stored = await _client.storage
+        .from(_mediaBucket)
+        .upload(key, bytes, contentType: contentType);
+    final rows = await _client.database
+        .from('complaint_media')
+        .insert({
+          'complaint_id': complaintId,
+          'user_id': userId,
+          'storage_key': stored.key,
+          'url': stored.url,
+          'media_type': mediaType,
+          'mime_type': contentType,
+        })
+        .select()
+        .execute();
+    if (rows.isEmpty) {
+      throw InsforgeException('No se pudo registrar el adjunto');
+    }
+    return ComplaintMedia.fromJson(rows.first);
+  }
+
+  /// URL firmada para descargar/mostrar el objeto (expira a los 60s).
+  Future<String> complaintMediaSignedUrl(String storageKey) async {
+    final strategy = await _client.storage
+        .from(_mediaBucket)
+        .getDownloadStrategy(storageKey);
+    return strategy.url;
+  }
+
+  /// Elimina el adjunto: el objeto del bucket y su fila en la base.
+  Future<void> deleteComplaintMedia(ComplaintMedia media) async {
+    await _client.storage.from(_mediaBucket).delete(media.storageKey);
+    await _client.database
+        .from('complaint_media')
+        .eq('id', media.id)
+        .delete()
+        .execute();
+  }
+
+  static String _uniqueMediaName(String filename) {
+    final clean = filename.replaceAll(RegExp(r'[^a-zA-Z0-9._-]'), '_');
+    return '${DateTime.now().millisecondsSinceEpoch}-$clean';
   }
 
   // ---------------------------------------------------------- notifications

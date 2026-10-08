@@ -82,6 +82,42 @@ class Complaint {
   }
 }
 
+class ComplaintMedia {
+  ComplaintMedia({
+    required this.id,
+    required this.complaintId,
+    required this.userId,
+    required this.storageKey,
+    required this.url,
+    required this.mediaType,
+    this.mimeType,
+    required this.createdAt,
+  });
+
+  final String id;
+  final String complaintId;
+  final String userId;
+  final String storageKey;
+  final String url;
+  final String mediaType;
+  final String? mimeType;
+  final DateTime createdAt;
+
+  bool get isImage => mediaType == 'image';
+
+  factory ComplaintMedia.fromJson(Map<String, dynamic> json) =>
+      ComplaintMedia(
+        id: json['id'].toString(),
+        complaintId: json['complaint_id'].toString(),
+        userId: json['user_id'].toString(),
+        storageKey: _str(json, 'storage_key'),
+        url: _str(json, 'url'),
+        mediaType: _str(json, 'media_type'),
+        mimeType: json['mime_type'] as String?,
+        createdAt: _parseDate(json['created_at']),
+      );
+}
+
 class StatusHistory {
   StatusHistory({
     required this.id,
