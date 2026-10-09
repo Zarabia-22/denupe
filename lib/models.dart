@@ -69,6 +69,7 @@ class Profile {
     this.district,
     required this.role,
     this.autoridadId,
+    this.createdAt,
   });
 
   final String id;
@@ -78,6 +79,7 @@ class Profile {
   final String? district;
   final String role;
   final String? autoridadId;
+  final DateTime? createdAt;
 
   bool get isFuncionario => role == 'funcionario';
 
@@ -89,6 +91,8 @@ class Profile {
         district: json['district'] as String?,
         role: _str(json, 'role'),
         autoridadId: json['autoridad_id']?.toString(),
+        createdAt:
+            json['created_at'] != null ? _parseDate(json['created_at']) : null,
       );
 }
 

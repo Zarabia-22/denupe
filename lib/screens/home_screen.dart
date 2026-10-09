@@ -5,6 +5,7 @@ import 'mis_denuncias_screen.dart';
 import 'new_complaint_screen.dart';
 import 'notifications_screen.dart';
 import 'panel_municipal_screen.dart';
+import 'profile_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,7 +36,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       setState(() {
         _isStaff = profile.isFuncionario;
-        if (!_isStaff && _index >= 3) _index = 0;
+        if (!_isStaff && _index > 3) _index = 0;
       });
     } catch (_) {
       // Sin rol conocido: no se muestra el panel.
@@ -103,6 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (_isStaff) const PanelMunicipalScreen(),
           NuevaDenunciaScreen(onCreated: () => setState(() => _index = 0)),
           NotificacionesScreen(tick: _notificationsTick),
+          const ProfileScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -129,6 +131,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.notifications_outlined),
             selectedIcon: Icon(Icons.notifications),
             label: 'Alertas',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.person_outline),
+            selectedIcon: Icon(Icons.person),
+            label: 'Perfil',
           ),
         ],
       ),

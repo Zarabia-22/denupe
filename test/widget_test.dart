@@ -97,6 +97,19 @@ void main() {
       expect(citizen.autoridadId, isNull);
     });
 
+    test('Profile.fromJson parsea created_at', () {
+      final profile = Profile.fromJson({
+        'id': 'u1',
+        'full_name': 'Ana',
+        'role': 'citizen',
+        'created_at': '2026-10-07T12:00:00Z',
+      });
+      expect(profile.createdAt, isNotNull);
+
+      final noDate = Profile.fromJson({'id': 'u2', 'role': 'citizen'});
+      expect(noDate.createdAt, isNull);
+    });
+
     test('statusLabel traduce los estados', () {
       expect(statusLabel('en_revision'), 'En revisión');
       expect(statusLabel('desconocido'), 'desconocido');
