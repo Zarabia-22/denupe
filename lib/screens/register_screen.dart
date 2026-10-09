@@ -64,8 +64,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _loading = true);
     try {
       await api.verifyEmail(email: _email.text.trim(), otp: _otp.text.trim());
-      // La sesión se crea al verificar: AuthGate navegará solo.
+      // verifyEmail crea la sesión (onAuthStateChange ya emitió signedIn),
+      // pero RegisterScreen sigue pusheada encima de AuthGate: hay que
+      // regresar a la raíz para que el menú principal quede visible.
+      if (!mounted) return;
       _showMessage('Correo verificado, bienvenido');
+      Navigator.of(context).popUntil((route) => route.isFirst);
     } on InsforgeException catch (e) {
       _showMessage(e.message);
     } catch (_) {
