@@ -16,6 +16,7 @@ class _PanelMunicipalScreenState extends State<PanelMunicipalScreen> {
   List<Complaint> _complaints = [];
   List<Category> _cats = [];
   List<Authority> _autoridades = [];
+  final Set<String> _subscribed = {};
   String _entidad = '';
   bool _loading = true;
   String? _error;
@@ -23,7 +24,33 @@ class _PanelMunicipalScreenState extends State<PanelMunicipalScreen> {
   @override
   void initState() {
     super.initState();
+    notificationsTick.addListener(_onTick);
     _load();
+  }
+
+  @override
+  void dispose() {
+    notificationsTick.removeListener(_onTick);
+    for (final id in _subscribed) {
+      realtime.unsubscribeComplaint(id);
+    }
+    super.dispose();
+  }
+
+  void _onTick() {
+    if (!mounted) return;
+    _load();
+  }
+
+  void _subscribeTo(List<Complaint> complaints) {
+    for (final c in complaints) {
+      if (_subscribed.add(c.id)) {
+        realtime.subscribeComplaint(c.id, (event) {
+          if (!mounted) return;
+          _load();
+        });
+      }
+    }
   }
 
   Future<void> _load() async {
@@ -47,6 +74,7 @@ class _PanelMunicipalScreenState extends State<PanelMunicipalScreen> {
         _entidad = authorityNameOf(_autoridades, profile.autoridadId);
         _loading = false;
       });
+      _subscribeTo(_complaints);
     } catch (e) {
       if (!mounted) return;
       setState(() {

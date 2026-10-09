@@ -15,13 +15,40 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
   List<Complaint> _complaints = [];
   List<Category> _cats = [];
   List<Authority> _autoridades = [];
+  final Set<String> _subscribed = {};
   bool _loading = true;
   String? _error;
 
   @override
   void initState() {
     super.initState();
+    notificationsTick.addListener(_onTick);
     _load();
+  }
+
+  @override
+  void dispose() {
+    notificationsTick.removeListener(_onTick);
+    for (final id in _subscribed) {
+      realtime.unsubscribeComplaint(id);
+    }
+    super.dispose();
+  }
+
+  void _onTick() {
+    if (!mounted) return;
+    _load();
+  }
+
+  void _subscribeTo(List<Complaint> complaints) {
+    for (final c in complaints) {
+      if (_subscribed.add(c.id)) {
+        realtime.subscribeComplaint(c.id, (event) {
+          if (!mounted) return;
+          _load();
+        });
+      }
+    }
   }
 
   Future<void> _load() async {
@@ -42,6 +69,7 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
         _autoridades = results[2] as List<Authority>;
         _loading = false;
       });
+      _subscribeTo(_complaints);
     } catch (e) {
       if (!mounted) return;
       setState(() {
