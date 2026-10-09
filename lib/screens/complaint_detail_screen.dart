@@ -6,9 +6,14 @@ import '../services/app_scope.dart';
 import '../services/complaint_realtime.dart';
 
 class ComplaintDetailScreen extends StatefulWidget {
-  const ComplaintDetailScreen({super.key, required this.complaintId});
+  const ComplaintDetailScreen({
+    super.key,
+    required this.complaintId,
+    this.showStatusUpdate = false,
+  });
 
   final String complaintId;
+  final bool showStatusUpdate;
 
   @override
   State<ComplaintDetailScreen> createState() => _ComplaintDetailScreenState();
@@ -112,6 +117,14 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           _StatusBanner(status: complaint.status),
+          if (widget.showStatusUpdate) ...[
+            const SizedBox(height: 12),
+            FilledButton.tonalIcon(
+              onPressed: _openStatusDialog,
+              icon: const Icon(Icons.update),
+              label: const Text('Cambiar estado'),
+            ),
+          ],
           const SizedBox(height: 16),
           Text(
             complaint.title,
@@ -205,6 +218,108 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
         const SnackBar(content: Text('No se pudo eliminar el adjunto')),
       );
     }
+  }
+
+  Future<void> _openStatusDialog() async {
+    final complaint = _complaint;
+    if (complaint == null) return;
+    final result = await showDialog<({String status, String note})>(
+      context: context,
+      builder: (_) => _StatusDialog(currentStatus: complaint.status),
+    );
+    if (result == null || !mounted) return;
+    try {
+      await api.updateComplaintStatus(
+        complaintId: widget.complaintId,
+        newStatus: result.status,
+        note: result.note.isEmpty ? null : result.note,
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Estado actualizado')),
+      );
+      _load();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudo actualizar el estado: ${e.toString()}')),
+      );
+    }
+  }
+}
+
+class _StatusDialog extends StatefulWidget {
+  const _StatusDialog({required this.currentStatus});
+
+  final String currentStatus;
+
+  @override
+  State<_StatusDialog> createState() => _StatusDialogState();
+}
+
+class _StatusDialogState extends State<_StatusDialog> {
+  String? _status;
+  final TextEditingController _noteController = TextEditingController();
+
+  @override
+  void dispose() {
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final options = statusLabels.entries
+        .where((e) => e.key != widget.currentStatus)
+        .toList();
+    return AlertDialog(
+      title: const Text('Actualizar estado'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            DropdownButtonFormField<String>(
+              initialValue: _status,
+              decoration: const InputDecoration(labelText: 'Nuevo estado'),
+              items: options
+                  .map((e) => DropdownMenuItem(
+                        value: e.key,
+                        child: Text(e.value),
+                      ))
+                  .toList(),
+              onChanged: (value) => setState(() => _status = value),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _noteController,
+              decoration: const InputDecoration(
+                labelText: 'Nota (opcional)',
+                hintText: 'Comentario para el ciudadano',
+              ),
+              maxLines: 3,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancelar'),
+        ),
+        FilledButton(
+          onPressed: _status == null
+              ? null
+              : () => Navigator.pop(
+                    context,
+                    (
+                      status: _status!,
+                      note: _noteController.text.trim(),
+                    ),
+                  ),
+          child: const Text('Guardar'),
+        ),
+      ],
+    );
   }
 }
 

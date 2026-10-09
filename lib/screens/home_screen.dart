@@ -4,6 +4,7 @@ import '../services/app_scope.dart';
 import 'mis_denuncias_screen.dart';
 import 'new_complaint_screen.dart';
 import 'notifications_screen.dart';
+import 'panel_municipal_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -15,6 +16,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _index = 0;
   int _notificationsTick = 0;
+  bool _isStaff = false;
 
   @override
   void initState() {
@@ -24,6 +26,20 @@ class _HomeScreenState extends State<HomeScreen> {
       realtime.connect(token: token);
     }
     notificationsTick.addListener(_onNotificationsTick);
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    try {
+      final profile = await api.myProfile();
+      if (!mounted) return;
+      setState(() {
+        _isStaff = profile.isFuncionario;
+        if (!_isStaff && _index >= 3) _index = 0;
+      });
+    } catch (_) {
+      // Sin rol conocido: no se muestra el panel.
+    }
   }
 
   void _onNotificationsTick() {
@@ -84,6 +100,7 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _index,
         children: [
           const MisDenunciasScreen(),
+          if (_isStaff) const PanelMunicipalScreen(),
           NuevaDenunciaScreen(onCreated: () => setState(() => _index = 0)),
           NotificacionesScreen(tick: _notificationsTick),
         ],
@@ -91,18 +108,24 @@ class _HomeScreenState extends State<HomeScreen> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: Icon(Icons.list_alt_outlined),
             selectedIcon: Icon(Icons.list_alt),
             label: 'Mis denuncias',
           ),
-          NavigationDestination(
+          if (_isStaff)
+            const NavigationDestination(
+              icon: Icon(Icons.badge_outlined),
+              selectedIcon: Icon(Icons.badge),
+              label: 'Panel',
+            ),
+          const NavigationDestination(
             icon: Icon(Icons.add_circle_outline),
             selectedIcon: Icon(Icons.add_circle),
             label: 'Nueva',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.notifications_outlined),
             selectedIcon: Icon(Icons.notifications),
             label: 'Alertas',
