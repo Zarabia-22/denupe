@@ -75,6 +75,28 @@ void main() {
       expect(notification.complaintId, 'c1');
     });
 
+    test('Profile.fromJson parsea rol y entidad', () {
+      final profile = Profile.fromJson({
+        'id': 'u1',
+        'full_name': 'Ana Funcionaria',
+        'role': 'funcionario',
+        'autoridad_id': 'aut-1',
+      });
+
+      expect(profile.fullName, 'Ana Funcionaria');
+      expect(profile.role, 'funcionario');
+      expect(profile.autoridadId, 'aut-1');
+      expect(profile.isFuncionario, isTrue);
+
+      final citizen = Profile.fromJson({
+        'id': 'u2',
+        'role': 'citizen',
+      });
+
+      expect(citizen.isFuncionario, isFalse);
+      expect(citizen.autoridadId, isNull);
+    });
+
     test('statusLabel traduce los estados', () {
       expect(statusLabel('en_revision'), 'En revisión');
       expect(statusLabel('desconocido'), 'desconocido');

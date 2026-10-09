@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 
-import 'package:insforge_flutter/insforge_flutter.dart';
+import 'package:insforge_flutter/insforge_flutter.dart' hide Profile;
 
 import '../models.dart';
 
@@ -57,6 +57,53 @@ class DenupeApi {
         .order('nombre')
         .execute();
     return rows.map(Authority.fromJson).toList();
+  }
+
+  // ---------------------------------------------------------------- profile
+
+  Future<Profile> myProfile() async {
+    final userId = _client.auth.currentUser!.id;
+    final rows = await _client.database
+        .from('perfiles')
+        .select('id,full_name,dni,phone,district,role,autoridad_id')
+        .eq('id', userId)
+        .execute();
+    if (rows.isEmpty) {
+      throw InsforgeException('Perfil no encontrado');
+    }
+    return Profile.fromJson(rows.first);
+  }
+
+  // ------------------------------------------------------ panel municipal
+
+  /// Denuncias asignadas a la entidad del funcionario autenticado.
+  Future<List<Complaint>> authorityComplaints() async {
+    final profile = await myProfile();
+    final autoridadId = profile.autoridadId;
+    if (autoridadId == null) return const [];
+    final rows = await _client.database
+        .from('denuncias')
+        .select(
+            'id,user_id,category_id,autoridad_id,title,description,address,latitude,longitude,status,priority,created_at,updated_at')
+        .eq('autoridad_id', autoridadId)
+        .order('created_at', ascending: false)
+        .execute();
+    return rows.map(Complaint.fromJson).toList();
+  }
+
+  /// Actualiza el estado de una denuncia (admin o entidad responsable).
+  Future<void> updateComplaintStatus({
+    required String complaintId,
+    required String newStatus,
+    String? note,
+  }) async {
+    await _client.database
+        .rpc('update_complaint_status', args: {
+          'p_complaint_id': complaintId,
+          'p_new_status': newStatus,
+          'p_note': note,
+        })
+        .execute();
   }
 
   // -------------------------------------------------------------- complaints
