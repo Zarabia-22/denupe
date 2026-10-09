@@ -65,13 +65,31 @@ class DenupeApi {
     final userId = _client.auth.currentUser!.id;
     final rows = await _client.database
         .from('perfiles')
-        .select('id,full_name,dni,phone,district,role,autoridad_id')
+        .select('id,full_name,dni,phone,district,role,autoridad_id,created_at')
         .eq('id', userId)
         .execute();
     if (rows.isEmpty) {
       throw InsforgeException('Perfil no encontrado');
     }
     return Profile.fromJson(rows.first);
+  }
+
+  /// Actualiza los datos editables del perfil propio (RPC acotado:
+  /// solo toca full_name, dni, phone y district; nunca el rol ni la entidad).
+  Future<void> updateProfile({
+    required String fullName,
+    String? dni,
+    String? phone,
+    String? district,
+  }) async {
+    await _client.database
+        .rpc('actualizar_perfil', args: {
+          'p_full_name': fullName,
+          'p_dni': dni,
+          'p_phone': phone,
+          'p_district': district,
+        })
+        .execute();
   }
 
   // ------------------------------------------------------ panel municipal
