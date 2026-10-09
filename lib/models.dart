@@ -60,6 +60,38 @@ class Authority {
       );
 }
 
+class Profile {
+  Profile({
+    required this.id,
+    this.fullName,
+    this.dni,
+    this.phone,
+    this.district,
+    required this.role,
+    this.autoridadId,
+  });
+
+  final String id;
+  final String? fullName;
+  final String? dni;
+  final String? phone;
+  final String? district;
+  final String role;
+  final String? autoridadId;
+
+  bool get isFuncionario => role == 'funcionario';
+
+  factory Profile.fromJson(Map<String, dynamic> json) => Profile(
+        id: json['id'].toString(),
+        fullName: json['full_name'] as String?,
+        dni: json['dni'] as String?,
+        phone: json['phone'] as String?,
+        district: json['district'] as String?,
+        role: _str(json, 'role'),
+        autoridadId: json['autoridad_id']?.toString(),
+      );
+}
+
 class Complaint {
   Complaint({
     required this.id,
