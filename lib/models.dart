@@ -1,5 +1,7 @@
 // Modelos de datos de DenuPe.
 
+import 'dart:typed_data';
+
 DateTime _parseDate(Object? value) {
   if (value is String) return DateTime.tryParse(value)?.toLocal() ?? DateTime.now();
   if (value is DateTime) return value.toLocal();
@@ -268,3 +270,18 @@ const Map<String, String> statusLabels = {
 };
 
 String statusLabel(String status) => statusLabels[status] ?? status;
+
+/// Adjunto pendiente de subir junto con la denuncia.
+class ComplaintAttachment {
+  const ComplaintAttachment({
+    required this.name,
+    required this.mediaType,
+    required this.bytes,
+    required this.contentType,
+  });
+
+  final String name;
+  final String mediaType;
+  final Uint8List bytes;
+  final String contentType;
+}
