@@ -102,7 +102,8 @@ class _HomeScreenState extends State<HomeScreen> {
         children: [
           const MisDenunciasScreen(),
           if (_isStaff) const PanelMunicipalScreen(),
-          NuevaDenunciaScreen(onCreated: () => setState(() => _index = 0)),
+          if (!_isStaff)
+            NuevaDenunciaScreen(onCreated: () => setState(() => _index = 0)),
           NotificacionesScreen(tick: _notificationsTick),
           const ProfileScreen(),
         ],
@@ -122,11 +123,12 @@ class _HomeScreenState extends State<HomeScreen> {
               selectedIcon: Icon(Icons.badge),
               label: 'Panel',
             ),
-          const NavigationDestination(
-            icon: Icon(Icons.add_circle_outline),
-            selectedIcon: Icon(Icons.add_circle),
-            label: 'Nueva',
-          ),
+          if (!_isStaff)
+            const NavigationDestination(
+              icon: Icon(Icons.add_circle_outline),
+              selectedIcon: Icon(Icons.add_circle),
+              label: 'Nueva',
+            ),
           const NavigationDestination(
             icon: Icon(Icons.notifications_outlined),
             selectedIcon: Icon(Icons.notifications),
