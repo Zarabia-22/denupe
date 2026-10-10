@@ -111,6 +111,10 @@ class Complaint {
     required this.priority,
     required this.createdAt,
     required this.updatedAt,
+    this.denuncianteNombre,
+    this.denuncianteDni,
+    this.denuncianteEmail,
+    this.denuncianteTelefono,
   });
 
   final String id;
@@ -126,6 +130,16 @@ class Complaint {
   final String priority;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final String? denuncianteNombre;
+  final String? denuncianteDni;
+  final String? denuncianteEmail;
+  final String? denuncianteTelefono;
+
+  bool get hasDenuncianteData =>
+      (denuncianteNombre?.trim().isNotEmpty ?? false) ||
+      (denuncianteDni?.trim().isNotEmpty ?? false) ||
+      (denuncianteEmail?.trim().isNotEmpty ?? false) ||
+      (denuncianteTelefono?.trim().isNotEmpty ?? false);
 
   factory Complaint.fromJson(Map<String, dynamic> json) {
     final lat = json['latitude'];
@@ -144,6 +158,10 @@ class Complaint {
       priority: _str(json, 'priority'),
       createdAt: _parseDate(json['created_at']),
       updatedAt: _parseDate(json['updated_at']),
+      denuncianteNombre: json['denunciante_nombre'] as String?,
+      denuncianteDni: json['denunciante_dni'] as String?,
+      denuncianteEmail: json['denunciante_email'] as String?,
+      denuncianteTelefono: json['denunciante_telefono'] as String?,
     );
   }
 }
