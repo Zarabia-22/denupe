@@ -149,6 +149,28 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
             detail:
                 '${_fmt(complaint.createdAt)} (actualizada: ${_fmt(complaint.updatedAt)})',
           ),
+          if (widget.showStatusUpdate && complaint.hasDenuncianteData) ...[
+            const Divider(height: 32),
+            Text(
+              'Datos del denunciante',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 8),
+            if (_notBlank(complaint.denuncianteNombre))
+              _InfoRow(label: 'Nombre', detail: complaint.denuncianteNombre!.trim()),
+            if (_notBlank(complaint.denuncianteDni))
+              _InfoRow(label: 'DNI', detail: complaint.denuncianteDni!.trim()),
+            if (_notBlank(complaint.denuncianteEmail))
+              _InfoRow(
+                label: 'Correo',
+                detail: complaint.denuncianteEmail!.trim(),
+              ),
+            if (_notBlank(complaint.denuncianteTelefono))
+              _InfoRow(
+                label: 'Teléfono',
+                detail: complaint.denuncianteTelefono!.trim(),
+              ),
+          ],
           const Divider(height: 32),
           Text('Seguimiento', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
@@ -324,6 +346,8 @@ class _StatusDialogState extends State<_StatusDialog> {
 }
 
 String _fmt(DateTime d) => '${d.day}/${d.month}/${d.year} ${d.hour}:${d.minute.toString().padLeft(2, '0')}';
+
+bool _notBlank(String? v) => v != null && v.trim().isNotEmpty;
 
 class _StatusBanner extends StatelessWidget {
   const _StatusBanner({required this.status});

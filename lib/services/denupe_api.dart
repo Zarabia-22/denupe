@@ -102,7 +102,7 @@ class DenupeApi {
     final rows = await _client.database
         .from('denuncias')
         .select(
-            'id,user_id,category_id,autoridad_id,title,description,address,latitude,longitude,status,priority,created_at,updated_at')
+            'id,user_id,category_id,autoridad_id,title,description,address,latitude,longitude,status,priority,created_at,updated_at,denunciante_nombre,denunciante_dni,denunciante_email,denunciante_telefono')
         .eq('autoridad_id', autoridadId)
         .order('created_at', ascending: false)
         .execute();
@@ -130,7 +130,7 @@ class DenupeApi {
     final rows = await _client.database
         .from('denuncias')
         .select(
-            'id,user_id,category_id,autoridad_id,title,description,address,latitude,longitude,status,priority,created_at,updated_at')
+            'id,user_id,category_id,autoridad_id,title,description,address,latitude,longitude,status,priority,created_at,updated_at,denunciante_nombre,denunciante_dni,denunciante_email,denunciante_telefono')
         .order('created_at', ascending: false)
         .execute();
     return rows.map(Complaint.fromJson).toList();
@@ -178,7 +178,7 @@ class DenupeApi {
     final rows = await _client.database
         .from('denuncias')
         .select(
-            'id,user_id,category_id,autoridad_id,title,description,address,latitude,longitude,status,priority,created_at,updated_at')
+            'id,user_id,category_id,autoridad_id,title,description,address,latitude,longitude,status,priority,created_at,updated_at,denunciante_nombre,denunciante_dni,denunciante_email,denunciante_telefono')
         .eq('id', id)
         .execute();
     if (rows.isEmpty) return null;
