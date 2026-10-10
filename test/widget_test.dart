@@ -44,6 +44,46 @@ void main() {
       expect(complaint.autoridadId, 'aut-1');
     });
 
+    test('Complaint.fromJson parsea los datos del denunciante', () {
+      final complaint = Complaint.fromJson({
+        'id': 'c1',
+        'user_id': 'u1',
+        'category_id': 'cat-1',
+        'title': 'Título',
+        'description': 'Descripción',
+        'status': 'recibida',
+        'priority': 'normal',
+        'created_at': '2026-10-07T10:00:00Z',
+        'updated_at': '2026-10-07T10:00:00Z',
+        'denunciante_nombre': 'Ana Ciudadana',
+        'denunciante_dni': '12345678',
+        'denunciante_email': 'ana@ejemplo.com',
+        'denunciante_telefono': '999888777',
+      });
+
+      expect(complaint.denuncianteNombre, 'Ana Ciudadana');
+      expect(complaint.denuncianteDni, '12345678');
+      expect(complaint.denuncianteEmail, 'ana@ejemplo.com');
+      expect(complaint.denuncianteTelefono, '999888777');
+      expect(complaint.hasDenuncianteData, isTrue);
+    });
+
+    test('Complaint.hasDenuncianteData es falso sin datos', () {
+      final complaint = Complaint.fromJson({
+        'id': 'c1',
+        'user_id': 'u1',
+        'title': 'Título',
+        'description': 'Descripción',
+        'status': 'recibida',
+        'priority': 'normal',
+        'created_at': '2026-10-07T10:00:00Z',
+        'updated_at': '2026-10-07T10:00:00Z',
+      });
+
+      expect(complaint.denuncianteNombre, isNull);
+      expect(complaint.hasDenuncianteData, isFalse);
+    });
+
     test('Authority.fromJson parsea las entidades receptoras', () {
       final authority = Authority.fromJson({
         'id': 'aut-1',

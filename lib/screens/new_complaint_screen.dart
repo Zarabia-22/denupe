@@ -3,10 +3,11 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:insforge_flutter/insforge_flutter.dart';
+import 'package:insforge_flutter/insforge_flutter.dart' hide Profile;
 
 import '../models.dart';
 import '../services/app_scope.dart';
+import 'profile_edit_screen.dart';
 
 class NuevaDenunciaScreen extends StatefulWidget {
   const NuevaDenunciaScreen({super.key, this.onCreated});
@@ -33,6 +34,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
   double? _latitude;
   double? _longitude;
   List<Category> _cats = [];
+  Profile? _profile;
   final List<_PendingMedia> _media = [];
 
   @override
@@ -52,10 +54,13 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
   Future<void> _loadCategories() async {
     setState(() => _loading = true);
     try {
-      final list = await categories();
+      final results = await Future.wait([categories(), api.myProfile()]);
+      final list = results[0] as List<Category>;
+      final profile = results[1] as Profile;
       if (!mounted) return;
       setState(() {
         _cats = list;
+        _profile = profile;
         _loading = false;
       });
       if (_categoryId == null && list.isNotEmpty) {
@@ -67,6 +72,25 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
         _loading = false;
         _error = e.toString();
       });
+    }
+  }
+
+  bool get _profileComplete {
+    final p = _profile;
+    if (p == null) return false;
+    return _notBlank(p.fullName) && _notBlank(p.dni) && _notBlank(p.phone);
+  }
+
+  static bool _notBlank(String? v) => v != null && v.trim().isNotEmpty;
+
+  Future<void> _editProfile() async {
+    final p = _profile;
+    if (p == null) return;
+    final changed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => ProfileEditScreen(profile: p)),
+    );
+    if (changed == true) {
+      _loadCategories();
     }
   }
 
@@ -142,6 +166,10 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
+    if (!_profileComplete) {
+      _showMessage('Completa tu DNI y teléfono en tu perfil para enviar la denuncia');
+      return;
+    }
     if (_categoryId == null) {
       _showMessage('Selecciona una categoría');
       return;
@@ -200,6 +228,87 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
       ..showSnackBar(SnackBar(content: Text(message)));
   }
 
+  List<Widget> _buildContactSection() {
+    final p = _profile!;
+    final email = api.currentUser?.email;
+    final complete = _profileComplete;
+    return [
+      Card(
+        elevation: 0,
+        margin: EdgeInsets.zero,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(color: Colors.grey.shade300),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.badge_outlined,
+                    size: 20,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Datos del denunciante',
+                    style: TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Se toman automáticamente de tu perfil.',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 8),
+              _ContactRow(label: 'Nombre', value: p.fullName),
+              _ContactRow(label: 'DNI', value: p.dni),
+              _ContactRow(label: 'Correo', value: email),
+              _ContactRow(label: 'Teléfono', value: p.phone),
+              if (!complete) ...[
+                const SizedBox(height: 8),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: Colors.orange.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'Completa tu DNI y teléfono en tu perfil para '
+                        'poder enviar la denuncia.',
+                      ),
+                      const SizedBox(height: 4),
+                      TextButton.icon(
+                        onPressed: _editProfile,
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text('Actualizar mi perfil'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+      const SizedBox(height: 16),
+    ];
+  }
+
   List<Widget> _buildMediaRow() {
     return [
       SizedBox(
@@ -252,6 +361,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
+              if (_profile != null) ..._buildContactSection(),
               DropdownButtonFormField<String>(
                 initialValue: _categoryId,
                 decoration: const InputDecoration(
@@ -340,9 +450,9 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
               FilledButton.icon(
-                onPressed: _submitting ? null : _submit,
+                onPressed: (_submitting || !_profileComplete) ? null : _submit,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
@@ -355,6 +465,17 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                     : const Icon(Icons.send),
                 label: const Text('Enviar denuncia'),
               ),
+              if (!_profileComplete) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'Para enviar la denuncia completa tu DNI y teléfono en tu perfil.',
+                  textAlign: TextAlign.center,
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: Colors.grey.shade600),
+                ),
+              ],
             ],
           ),
         ),
@@ -364,6 +485,44 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
 }
 
 /// Archivo elegido que se subirá junto con la denuncia.
+class _ContactRow extends StatelessWidget {
+  const _ContactRow({required this.label, required this.value});
+
+  final String label;
+  final String? value;
+
+  @override
+  Widget build(BuildContext context) {
+    final has = value != null && value!.trim().isNotEmpty;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 84,
+            child: Text(
+              label,
+              style: TextStyle(color: Colors.grey.shade600, fontSize: 13),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              has ? value!.trim() : 'No registrado',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: has ? null : Colors.orange.shade800,
+                fontStyle: has ? FontStyle.normal : FontStyle.italic,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _PendingMedia {
   _PendingMedia({
     required this.xfile,
