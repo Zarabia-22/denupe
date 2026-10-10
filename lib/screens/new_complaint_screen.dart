@@ -1,12 +1,10 @@
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:insforge_flutter/insforge_flutter.dart' hide Profile;
 
 import '../models.dart';
 import '../services/app_scope.dart';
+import 'complaint_confirmation_screen.dart';
 import 'profile_edit_screen.dart';
 
 class NuevaDenunciaScreen extends StatefulWidget {
@@ -30,12 +28,11 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
   String? _categoryId;
   String? _error;
   bool _loading = false;
-  bool _submitting = false;
   double? _latitude;
   double? _longitude;
   List<Category> _cats = [];
   Profile? _profile;
-  final List<_PendingMedia> _media = [];
+  final List<ComplaintAttachment> _media = [];
 
   @override
   void initState() {
@@ -148,8 +145,8 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
         return;
       }
       setState(() {
-        _media.add(_PendingMedia(
-          xfile: file,
+        _media.add(ComplaintAttachment(
+          name: file.name,
           mediaType: mediaType,
           bytes: bytes,
           contentType: _mimeFromName(file.name, mediaType),
@@ -170,55 +167,37 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
       _showMessage('Completa tu DNI y teléfono en tu perfil para enviar la denuncia');
       return;
     }
-    if (_categoryId == null) {
+    final categoryId = _categoryId;
+    if (categoryId == null) {
       _showMessage('Selecciona una categoría');
       return;
     }
-    setState(() => _submitting = true);
-    try {
-      final complaint = await api.createComplaint(
-        categoryId: _categoryId!,
-        title: _title.text.trim(),
-        description: _description.text.trim(),
-        address: _address.text.trim().isEmpty ? null : _address.text.trim(),
-        latitude: _latitude,
-        longitude: _longitude,
-      );
-      bumpNotificationsTick();
-      final pending = List<_PendingMedia>.of(_media);
-      _media.clear();
-      if (mounted) setState(() {});
-      for (final item in pending) {
-        try {
-          await api.uploadComplaintMedia(
-            complaintId: complaint.id,
-            bytes: item.bytes,
-            filename: item.xfile.name,
-            contentType: item.contentType,
-            mediaType: item.mediaType,
-          );
-        } catch (_) {
-          if (!mounted) return;
-          _showMessage('"${item.xfile.name}" no se pudo adjuntar');
-        }
-      }
-      if (!mounted) return;
-      _showMessage('Denuncia enviada. ¡Gracias por reportar!');
-      _title.clear();
-      _description.clear();
-      _address.clear();
-      setState(() {
-        _latitude = null;
-        _longitude = null;
-      });
-      widget.onCreated?.call();
-    } on InsforgeException catch (e) {
-      _showMessage(e.message);
-    } catch (_) {
-      _showMessage('Error de conexión');
-    } finally {
-      if (mounted) setState(() => _submitting = false);
-    }
+    final submitted = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => ComplaintConfirmationScreen(
+          categoryId: categoryId,
+          title: _title.text.trim(),
+          description: _description.text.trim(),
+          address: _address.text.trim().isEmpty ? null : _address.text.trim(),
+          latitude: _latitude,
+          longitude: _longitude,
+          media: List<ComplaintAttachment>.of(_media),
+          categories: _cats,
+        ),
+      ),
+    );
+    if (submitted != true || !mounted) return;
+    bumpNotificationsTick();
+    _media.clear();
+    _title.clear();
+    _description.clear();
+    _address.clear();
+    setState(() {
+      _latitude = null;
+      _longitude = null;
+    });
+    _showMessage('Denuncia enviada. ¡Gracias por reportar!');
+    widget.onCreated?.call();
   }
 
   void _showMessage(String message) {
@@ -452,17 +431,11 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
               ),
               const SizedBox(height: 16),
               FilledButton.icon(
-                onPressed: (_submitting || !_profileComplete) ? null : _submit,
+                onPressed: !_profileComplete ? null : _submit,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                icon: _submitting
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.send),
+                icon: const Icon(Icons.send),
                 label: const Text('Enviar denuncia'),
               ),
               if (!_profileComplete) ...[
@@ -523,24 +496,10 @@ class _ContactRow extends StatelessWidget {
   }
 }
 
-class _PendingMedia {
-  _PendingMedia({
-    required this.xfile,
-    required this.mediaType,
-    required this.bytes,
-    required this.contentType,
-  });
-
-  final XFile xfile;
-  final String mediaType;
-  final Uint8List bytes;
-  final String contentType;
-}
-
 class _PendingMediaTile extends StatelessWidget {
   const _PendingMediaTile({required this.media, required this.onRemove});
 
-  final _PendingMedia media;
+  final ComplaintAttachment media;
   final VoidCallback onRemove;
 
   @override
