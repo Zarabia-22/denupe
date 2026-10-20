@@ -38,7 +38,7 @@ class DenupeApi {
 
   Future<List<Category>> categories() async {
     final rows = await _client.database
-        .from('categories')
+        .from('categorias')
         .select('id,code,name,description')
         .order('sort_order')
         .execute();
@@ -49,7 +49,7 @@ class DenupeApi {
 
   Future<List<Complaint>> myComplaints() async {
     final rows = await _client.database
-        .from('complaints')
+        .from('denuncias')
         .select(
             'id,user_id,category_id,title,description,address,latitude,longitude,status,priority,created_at,updated_at')
         .order('created_at', ascending: false)
@@ -67,7 +67,7 @@ class DenupeApi {
   }) async {
     final userId = _client.auth.currentUser!.id;
     final rows = await _client.database
-        .from('complaints')
+        .from('denuncias')
         .insert({
           'user_id': userId,
           'category_id': categoryId,
@@ -87,7 +87,7 @@ class DenupeApi {
 
   Future<List<StatusHistory>> complaintHistory(String complaintId) async {
     final rows = await _client.database
-        .from('complaint_status_history')
+        .from('historial_estados')
         .select('id,complaint_id,status,note,created_at')
         .eq('complaint_id', complaintId)
         .order('created_at')
@@ -97,7 +97,7 @@ class DenupeApi {
 
   Future<Complaint?> complaintById(String id) async {
     final rows = await _client.database
-        .from('complaints')
+        .from('denuncias')
         .select(
             'id,user_id,category_id,title,description,address,latitude,longitude,status,priority,created_at,updated_at')
         .eq('id', id)
@@ -110,7 +110,7 @@ class DenupeApi {
 
   Future<List<AppNotification>> notifications() async {
     final rows = await _client.database
-        .from('notifications')
+        .from('notificaciones')
         .select('id,user_id,complaint_id,title,body,is_read,created_at')
         .order('created_at', ascending: false)
         .execute();
@@ -119,7 +119,7 @@ class DenupeApi {
 
   Future<void> markNotificationRead(String id) async {
     await _client.database
-        .from('notifications')
+        .from('notificaciones')
         .eq('id', id)
         .update({'is_read': true})
         .execute();
