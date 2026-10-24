@@ -7,7 +7,7 @@ Diseño HTML responsive basado en la opción 3 aprobada: encabezado ilustrado de
 1. Abre la configuración de plantillas de correo de autenticación de tu proyecto InsForge.
 2. Selecciona la plantilla de **verificación por código**.
 3. Copia el contenido de `verification-email.html` en el editor HTML.
-4. **Importante:** sustituye `{{verification_code}}` por la variable exacta de OTP que admita tu versión de InsForge. Esta cadena es un marcador local y no se ha verificado como sintaxis de InsForge.
+4. **Importante:** usa `{{code}}` como variable del código OTP (ajústala a la que admita tu instancia de InsForge si difiere).
 5. Asunto sugerido: `DenuPe | Confirma tu correo electrónico`.
 6. Envía un correo de prueba y comprueba el código real en Gmail y Outlook.
 
