@@ -313,16 +313,23 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _statusColor(status);
+    final isInProgress = status == 'en_proceso';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: isInProgress
+            ? DenuPeColors.warning
+            : color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
 
       ),
       child: Text(
         statusLabel(status),
-        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          color: isInProgress ? DenuPeColors.text : color,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
