@@ -89,15 +89,18 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     }
     if (_error != null) {
       return Center(
-        child: Column(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.cloud_off, size: 48),
             const SizedBox(height: 12),
-            const Text('No se pudieron cargar las notificaciones'),
+            const Text('No se pudieron cargar las notificaciones', textAlign: TextAlign.center),
             const SizedBox(height: 12),
             FilledButton.tonal(onPressed: _load, child: const Text('Reintentar')),
           ],
+          ),
         ),
       );
     }
@@ -119,14 +122,19 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
         Expanded(
           child: _items.isEmpty
               ? const Center(
-                  child: Column(
+                  child: Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.notifications_none, size: 56),
                       SizedBox(height: 12),
                       Text(
-                          'No hay alertas. Te avisaremos aquí cuando tu denuncia cambie de estado.'),
+                        'No hay alertas. Te avisaremos aquí cuando tu denuncia cambie de estado.',
+                        textAlign: TextAlign.center,
+                      ),
                     ],
+                    ),
                   ),
                 )
               : RefreshIndicator(
