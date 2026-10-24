@@ -102,7 +102,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
           children: [
             const Icon(Icons.cloud_off, size: 48),
             const SizedBox(height: 12),
-            const Text('No se pudo cargar la denuncia'),
+            const Text('No se pudo cargar la denuncia', textAlign: TextAlign.center),
             const SizedBox(height: 12),
             FilledButton.tonal(onPressed: _load, child: const Text('Reintentar')),
           ],
@@ -111,7 +111,12 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
     }
     final complaint = _complaint;
     if (complaint == null) {
-      return const Center(child: Text('Denuncia no encontrada'));
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24),
+          child: Text('Denuncia no encontrada', textAlign: TextAlign.center),
+        ),
+      );
     }
     return RefreshIndicator(
       onRefresh: _load,
