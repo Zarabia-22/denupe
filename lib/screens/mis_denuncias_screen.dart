@@ -290,7 +290,7 @@ class _ComplaintThumbnailState extends State<_ComplaintThumbnail> {
             return Image.network(
               url,
               fit: BoxFit.cover,
-              errorBuilder: (_, _, _) => _placeholder(),
+              errorBuilder: (context, error, stackTrace) => _placeholder(),
             );
           },
         ),
