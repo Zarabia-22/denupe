@@ -121,6 +121,9 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       bottomNavigationBar: NavigationBar(
+        height: 70,
+        backgroundColor: DenuPeColors.surface,
+        indicatorColor: const Color(0xFFE3F2FD),
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),
         destinations: [
