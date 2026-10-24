@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../theme/denupe_colors.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models.dart';
@@ -609,13 +611,13 @@ class _HistoryTile extends StatelessWidget {
 Color _statusColor(String status) {
   switch (status) {
     case 'en_revision':
-      return const Color(0xFF1565C0);
+      return DenuPeColors.primary;
     case 'en_proceso':
-      return const Color(0xFFEF6C00);
+      return DenuPeColors.warningText;
     case 'resuelta':
-      return const Color(0xFF2E7D32);
+      return DenuPeColors.success;
     case 'rechazada':
-      return const Color(0xFFC62828);
+      return DenuPeColors.error;
     case 'archivada':
       return Colors.grey;
     default:

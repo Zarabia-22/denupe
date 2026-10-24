@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/denupe_colors.dart';
+
 import '../models.dart';
 import '../services/app_scope.dart';
 import 'complaint_detail_screen.dart';
@@ -208,7 +210,7 @@ class _NotificationCard extends StatelessWidget {
                   height: 10,
                   margin: const EdgeInsets.only(top: 6, left: 8),
                   decoration: const BoxDecoration(
-                    color: Color(0xFF1565C0),
+                    color: DenuPeColors.primary,
                     shape: BoxShape.circle,
                   ),
                 ),

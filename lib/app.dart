@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:insforge_flutter/insforge_flutter.dart';
 
+import 'theme/denupe_colors.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
 
@@ -13,10 +14,53 @@ class DenuPeApp extends StatelessWidget {
       title: 'DenuPe',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF1565C0)),
         useMaterial3: true,
+        scaffoldBackgroundColor: DenuPeColors.background,
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: DenuPeColors.primary,
+          primary: DenuPeColors.primary,
+          onPrimary: DenuPeColors.surface,
+          surface: DenuPeColors.surface,
+          onSurface: DenuPeColors.text,
+          error: DenuPeColors.error,
+          brightness: Brightness.light,
+        ),
+        appBarTheme: const AppBarTheme(
+          backgroundColor: DenuPeColors.primary,
+          foregroundColor: DenuPeColors.surface,
+          centerTitle: false,
+        ),
+        cardTheme: CardThemeData(
+          color: DenuPeColors.surface,
+          elevation: 0,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: const BorderSide(color: DenuPeColors.border),
+          ),
+        ),
         inputDecorationTheme: const InputDecorationTheme(
           border: OutlineInputBorder(),
+          focusedBorder: OutlineInputBorder(
+            borderSide: BorderSide(color: DenuPeColors.primary, width: 2),
+          ),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(
+            backgroundColor: DenuPeColors.primary,
+            foregroundColor: DenuPeColors.surface,
+            minimumSize: const Size(0, 48),
+          ),
+        ),
+        navigationBarTheme: NavigationBarThemeData(
+          backgroundColor: DenuPeColors.surface,
+          indicatorColor: DenuPeColors.primary.withValues(alpha: 0.12),
+          labelTextStyle: WidgetStateProperty.all(
+            const TextStyle(color: DenuPeColors.text),
+          ),
+        ),
+        snackBarTheme: const SnackBarThemeData(
+          backgroundColor: DenuPeColors.text,
+          contentTextStyle: TextStyle(color: DenuPeColors.surface),
         ),
       ),
       home: const AuthGate(),

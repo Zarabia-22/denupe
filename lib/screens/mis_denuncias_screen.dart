@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/denupe_colors.dart';
+
 import '../models.dart';
 import '../services/app_scope.dart';
 import 'complaint_detail_screen.dart';
@@ -258,13 +260,13 @@ class _StatusChip extends StatelessWidget {
 Color _statusColor(String status) {
   switch (status) {
     case 'en_revision':
-      return const Color(0xFF1565C0);
+      return DenuPeColors.primary;
     case 'en_proceso':
-      return const Color(0xFFEF6C00);
+      return DenuPeColors.warningText;
     case 'resuelta':
-      return const Color(0xFF2E7D32);
+      return DenuPeColors.success;
     case 'rechazada':
-      return const Color(0xFFC62828);
+      return DenuPeColors.error;
     case 'archivada':
       return Colors.grey;
     default: // recibida
