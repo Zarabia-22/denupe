@@ -91,53 +91,103 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
     _load();
   }
 
+  bool _matchesFilter(Complaint complaint) {
+    switch (_filter) {
+      case 'En proceso':
+        return complaint.status == 'en_proceso' ||
+            complaint.status == 'en_revision';
+      case 'Resueltas':
+        return complaint.status == 'resuelta';
+      case 'Rechazadas':
+        return complaint.status == 'rechazada';
+      default:
+        return true;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_error != null) {
-      return _StatusMessage(
-        icon: Icons.cloud_off,
-        title: 'No se pudieron cargar las denuncias',
-        detail: _error!,
-        retryLabel: 'Reintentar',
-        onRetry: _load,
-      );
-    }
-    if (_complaints.isEmpty) {
-      return const _StatusMessage(
-        icon: Icons.inbox_outlined,
-        title: 'Aún no tienes denuncias',
-        detail: 'Toca "Nueva" para reportar un problema en tu ciudad.',
-      );
-    }
-    final filtered = _complaints.where((c) {
-      if (_filter == 'En proceso') return c.status == 'en_proceso' || c.status == 'en_revision';
-      if (_filter == 'Resueltas') return c.status == 'resuelta';
-      if (_filter == 'Rechazadas') return c.status == 'rechazada';
-      return true;
-    }).toList();
-    return Column(children: [
-      SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(12), child: Row(children: ['Todas', 'En proceso', 'Resueltas', 'Rechazadas'].map((name) => Padding(padding: const EdgeInsets.only(right: 6), child: ChoiceChip(label: Text(name), selected: _filter == name, onSelected: (_) => setState(() => _filter = name)))).toList())),
-      Expanded(child: RefreshIndicator(
-      onRefresh: _load,
-      child: ListView.separated(
-        padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
-        itemCount: filtered.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 10),
-        itemBuilder: (context, index) {
-          final item = filtered[index];
-          return _ComplaintCard(
-            complaint: item,
-            categoryName: categoryNameOf(_cats, item.categoryId),
-            authorityName: authorityNameOf(_autoridades, item.autoridadId),
-            onTap: () => _openDetail(item),
-          );
-        },
-      ),
-    )),
-    ]);
+    final filtered = _complaints.where(_matchesFilter).toList();
+    const filters = ['Todas', 'En proceso', 'Resueltas', 'Rechazadas'];
+
+    return Column(
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          child: Row(
+            children: filters.map((name) {
+              final selected = _filter == name;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text(name),
+                  selected: selected,
+                  showCheckmark: false,
+                  selectedColor: const Color(0xFFE3F2FD),
+                  labelStyle: TextStyle(
+                    color: selected ? DenuPeColors.primary : DenuPeColors.text,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                  side: BorderSide(
+                    color: selected ? DenuPeColors.primary : DenuPeColors.border,
+                  ),
+                  onSelected: (_) => setState(() => _filter = name),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        Expanded(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+                  ? _StatusMessage(
+                      icon: Icons.cloud_off,
+                      title: 'No se pudieron cargar las denuncias',
+                      detail: _error!,
+                      retryLabel: 'Reintentar',
+                      onRetry: _load,
+                    )
+                  : _complaints.isEmpty
+                      ? const _StatusMessage(
+                          icon: Icons.inbox_outlined,
+                          title: 'Aún no tienes denuncias',
+                          detail: 'Toca "Nueva" para reportar un problema en tu ciudad.',
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          child: filtered.isEmpty
+                              ? ListView(
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  children: [
+                                    const SizedBox(height: 90),
+                                    _StatusMessage(
+                                      icon: Icons.filter_alt_off_outlined,
+                                      title: 'Sin denuncias en este estado',
+                                      detail: 'No tienes denuncias que coincidan con el filtro "$_filter".',
+                                    ),
+                                  ],
+                                )
+                              : ListView.separated(
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                                  itemCount: filtered.length,
+                                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                                  itemBuilder: (context, index) {
+                                    final item = filtered[index];
+                                    return _ComplaintCard(
+                                      complaint: item,
+                                      categoryName: categoryNameOf(_cats, item.categoryId),
+                                      authorityName: authorityNameOf(_autoridades, item.autoridadId),
+                                      onTap: () => _openDetail(item),
+                                    );
+                                  },
+                                ),
+                        ),
+        ),
+      ],
+    );
   }
 }
 
@@ -313,16 +363,23 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _statusColor(status);
+    final isInProgress = status == 'en_proceso';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: isInProgress
+            ? DenuPeColors.warning
+            : color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
 
       ),
       child: Text(
         statusLabel(status),
-        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          color: isInProgress ? DenuPeColors.text : color,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
