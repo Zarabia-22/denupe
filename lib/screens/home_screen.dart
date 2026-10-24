@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/app_scope.dart';
+import '../theme/denupe_colors.dart';
 import 'mis_denuncias_screen.dart';
 import 'new_complaint_screen.dart';
 import 'notifications_screen.dart';
@@ -15,7 +16,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _index = 0;
+  int _index = 1;
   int _notificationsTick = 0;
   bool _isStaff = false;
 
@@ -36,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       setState(() {
         _isStaff = profile.isFuncionario;
-        if (!_isStaff && _index > 3) _index = 0;
+        if (!_isStaff && _index > 3) _index = 1;
       });
     } catch (_) {
       // Sin rol conocido: no se muestra el panel.
@@ -88,7 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('DenuPe'),
+        title: const Text('DenuPe', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -100,18 +101,27 @@ class _HomeScreenState extends State<HomeScreen> {
       body: IndexedStack(
         index: _index,
         children: [
+          if (!_isStaff)
+            NuevaDenunciaScreen(onCreated: () => setState(() => _index = 1)),
           const MisDenunciasScreen(),
           if (_isStaff) const PanelMunicipalScreen(),
-          if (!_isStaff)
-            NuevaDenunciaScreen(onCreated: () => setState(() => _index = 0)),
           NotificacionesScreen(tick: _notificationsTick),
           const ProfileScreen(),
         ],
       ),
       bottomNavigationBar: NavigationBar(
+        height: 70,
+        backgroundColor: DenuPeColors.surface,
+        indicatorColor: const Color(0xFFE3F2FD),
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),
         destinations: [
+          if (!_isStaff)
+            const NavigationDestination(
+              icon: Icon(Icons.add_circle_outline),
+              selectedIcon: Icon(Icons.add_circle),
+              label: 'Nueva',
+            ),
           const NavigationDestination(
             icon: Icon(Icons.list_alt_outlined),
             selectedIcon: Icon(Icons.list_alt),
@@ -123,16 +133,10 @@ class _HomeScreenState extends State<HomeScreen> {
               selectedIcon: Icon(Icons.badge),
               label: 'Panel',
             ),
-          if (!_isStaff)
-            const NavigationDestination(
-              icon: Icon(Icons.add_circle_outline),
-              selectedIcon: Icon(Icons.add_circle),
-              label: 'Nueva',
-            ),
           const NavigationDestination(
             icon: Icon(Icons.notifications_outlined),
             selectedIcon: Icon(Icons.notifications),
-            label: 'Alertas',
+            label: 'Notificaciones',
           ),
           const NavigationDestination(
             icon: Icon(Icons.person_outline),

@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+
+import '../theme/denupe_colors.dart';
+import '../widgets/location_preview.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -25,6 +28,14 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
   final _description = TextEditingController();
   final _address = TextEditingController();
   final _picker = ImagePicker();
+  final _titleFocus = FocusNode();
+  final _descriptionFocus = FocusNode();
+  final _addressFocus = FocusNode();
+  int _activeStep = 0;
+
+  void _setStep(int step) {
+    if (_activeStep != step && mounted) setState(() => _activeStep = step);
+  }
   String? _categoryId;
   String? _error;
   bool _loading = false;
@@ -38,6 +49,9 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
   void initState() {
     super.initState();
     _loadCategories();
+    _titleFocus.addListener(() { if (_titleFocus.hasFocus) _setStep(0); });
+    _descriptionFocus.addListener(() { if (_descriptionFocus.hasFocus) _setStep(0); });
+    _addressFocus.addListener(() { if (_addressFocus.hasFocus) _setStep(1); });
   }
 
   @override
@@ -45,6 +59,9 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
     _title.dispose();
     _description.dispose();
     _address.dispose();
+    _titleFocus.dispose();
+    _descriptionFocus.dispose();
+    _addressFocus.dispose();
     super.dispose();
   }
 
@@ -92,6 +109,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
   }
 
   Future<void> _captureLocation() async {
+    _setStep(1);
     try {
       if (!await Geolocator.isLocationServiceEnabled()) {
         _showMessage('El servicio de ubicación está desactivado');
@@ -119,6 +137,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
   }
 
   Future<void> _pickImage() async {
+    _setStep(2);
     final file = await _picker.pickImage(
       source: ImageSource.gallery,
       maxWidth: 2048,
@@ -128,6 +147,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
   }
 
   Future<void> _pickVideo() async {
+    _setStep(2);
     final file = await _picker.pickVideo(source: ImageSource.gallery);
     await _addMedia(file, 'video');
   }
@@ -158,11 +178,16 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
   }
 
   void _removeMedia(int index) {
+    _setStep(2);
     setState(() => _media.removeAt(index));
   }
 
   Future<void> _submit() async {
-    if (!_formKey.currentState!.validate()) return;
+    _setStep(3);
+    if (!_formKey.currentState!.validate()) {
+      _setStep(0);
+      return;
+    }
     if (!_profileComplete) {
       _showMessage('Completa tu DNI y teléfono en tu perfil para enviar la denuncia');
       return;
@@ -257,10 +282,10 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.12),
+                    color: DenuPeColors.warning.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: Colors.orange.withValues(alpha: 0.4),
+                      color: DenuPeColors.warning.withValues(alpha: 0.4),
                     ),
                   ),
                   child: Column(
@@ -322,7 +347,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
           children: [
             const Icon(Icons.cloud_off, size: 48),
             const SizedBox(height: 12),
-            const Text('No se pudieron cargar las categorías'),
+            const Text('No se pudieron cargar las categorías', textAlign: TextAlign.center),
             const SizedBox(height: 12),
             FilledButton.tonal(
               onPressed: _loadCategories,
@@ -332,19 +357,49 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
         ),
       );
     }
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return Column(
       children: [
-        Form(
+        // El indicador permanece visible mientras el formulario se desplaza.
+        Material(
+          color: DenuPeColors.surface,
+          elevation: 1,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: _ComplaintSteps(activeStep: _activeStep),
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (_profile != null) ..._buildContactSection(),
+
+              TextFormField(
+                controller: _title,
+                focusNode: _titleFocus,
+                decoration: const InputDecoration(labelText: 'Título de la denuncia *', hintText: 'Escribe un título breve', prefixIcon: Icon(Icons.edit_outlined)),
+                maxLength: 100,
+                validator: (v) => v == null || v.trim().length < 5 ? 'Escribe al menos 5 caracteres' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _description,
+                focusNode: _descriptionFocus,
+                decoration: const InputDecoration(labelText: 'Descripción *', hintText: 'Describe la situación...', alignLabelWithHint: true, prefixIcon: Icon(Icons.description_outlined)),
+                maxLength: 500,
+                minLines: 3,
+                maxLines: 5,
+                validator: (v) => v == null || v.trim().length < 10 ? 'Escribe al menos 10 caracteres' : null,
+              ),
+              const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _categoryId,
                 decoration: const InputDecoration(
-                  labelText: 'Categoría',
+                  labelText: 'Categoría *',
                   prefixIcon: Icon(Icons.category_outlined),
                 ),
                 items: _cats
@@ -353,54 +408,32 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                           child: Text(c.name),
                         ))
                     .toList(),
-                onChanged: (v) => setState(() => _categoryId = v),
+                onTap: () => _setStep(0),
+                onChanged: (v) { _setStep(0); setState(() => _categoryId = v); },
                 validator: (v) => v == null ? 'Selecciona una categoría' : null,
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _title,
-                decoration: const InputDecoration(
-                  labelText: 'Título',
-                  prefixIcon: Icon(Icons.title),
-                ),
-                maxLength: 120,
-                validator: (v) =>
-                    (v == null || v.trim().length < 5)
-                        ? 'Describe el problema en pocas palabras'
-                        : null,
-              ),
+              const Text('Ubicación', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
-              TextFormField(
-                controller: _description,
-                decoration: const InputDecoration(
-                  labelText: 'Descripción',
-                  alignLabelWithHint: true,
-                ),
-                minLines: 3,
-                maxLines: 6,
-                validator: (v) =>
-                    (v == null || v.trim().length < 10)
-                        ? 'Da más detalles (mínimo 10 caracteres)'
-                        : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _address,
-                decoration: const InputDecoration(
-                  labelText: 'Dirección o referencia (opcional)',
-                  prefixIcon: Icon(Icons.place_outlined),
-                ),
-              ),
+              GestureDetector(onTap: () => _setStep(1), child: const LocationPreview()),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: _captureLocation,
                 icon: const Icon(Icons.my_location),
-                label: _latitude != null && _longitude != null
-                    ? Text(
-                        'Ubicación: '
-                        '${_latitude!.toStringAsFixed(5)}, '
-                        '${_longitude!.toStringAsFixed(5)}')
-                    : const Text('Usar mi ubicación'),
+                label: const Text('Usar mi ubicación actual'),
+              ),
+              if (_latitude != null && _longitude != null)
+                Text('Lat: ${_latitude!.toStringAsFixed(5)}, Lng: ${_longitude!.toStringAsFixed(5)}',
+                    style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _address,
+                focusNode: _addressFocus,
+                decoration: const InputDecoration(
+                  labelText: 'Dirección referencial (opcional)',
+                  hintText: 'Ej. Av. Los Olivos 123',
+                  prefixIcon: Icon(Icons.place_outlined),
+                ),
               ),
               const SizedBox(height: 24),
               Text('Adjuntos', style: Theme.of(context).textTheme.titleSmall),
@@ -430,14 +463,14 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              FilledButton.icon(
+              Row(children: [Expanded(child: OutlinedButton(onPressed: () { _formKey.currentState?.reset(); _title.clear(); _description.clear(); _address.clear(); setState(() { _latitude = null; _longitude = null; _media.clear(); }); }, child: const Text('Cancelar'))), const SizedBox(width: 8), Expanded(child: FilledButton.icon(
                 onPressed: !_profileComplete ? null : _submit,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                icon: const Icon(Icons.send),
-                label: const Text('Enviar denuncia'),
-              ),
+                icon: const Icon(Icons.arrow_forward),
+                label: const Text('Siguiente'),
+              ))]),
               if (!_profileComplete) ...[
                 const SizedBox(height: 8),
                 Text(
@@ -449,6 +482,9 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                       ?.copyWith(color: Colors.grey.shade600),
                 ),
               ],
+            ],
+          ),
+              ),
             ],
           ),
         ),
@@ -554,4 +590,78 @@ String _mimeFromName(String filename, String mediaType) {
   if (ext.endsWith('.m4v')) return 'video/x-m4v';
   if (ext.endsWith('.avi')) return 'video/x-msvideo';
   return 'video/mp4';
+}
+class _ComplaintSteps extends StatelessWidget {
+  const _ComplaintSteps({required this.activeStep});
+
+  final int activeStep;
+
+  @override
+  Widget build(BuildContext context) {
+    const steps = ['Datos', 'Ubicación', 'Evidencia', 'Revisar'];
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var index = 0; index < steps.length; index++) ...[
+          Expanded(
+            child: Column(
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  width: 26,
+                  height: 26,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: index == activeStep
+                        ? DenuPeColors.primary
+                        : DenuPeColors.surface,
+                    border: Border.all(
+                      color: index <= activeStep
+                          ? DenuPeColors.primary
+                          : DenuPeColors.border,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Text('${index + 1}',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: index == activeStep
+                          ? FontWeight.bold : FontWeight.normal,
+                      color: index == activeStep
+                          ? DenuPeColors.surface : DenuPeColors.text,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(steps[index],
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: index == activeStep
+                        ? DenuPeColors.primary : DenuPeColors.text,
+                    fontWeight: index == activeStep
+                        ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (index < steps.length - 1)
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(top: 12),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 180),
+                  height: 2,
+                  color: index < activeStep
+                      ? DenuPeColors.primary
+                      : DenuPeColors.border,
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
 }
