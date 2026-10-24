@@ -374,7 +374,7 @@ class _StatusBanner extends StatelessWidget {
           Text(
             'Estado: ${statusLabel(status)}',
             style: TextStyle(
-              color: color,
+              color: textColor,
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
