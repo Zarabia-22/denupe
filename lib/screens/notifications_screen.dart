@@ -131,17 +131,29 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
                 )
               : RefreshIndicator(
                   onRefresh: _load,
-                  child: ListView.separated(
+                  child: ListView(
                     padding: const EdgeInsets.all(12),
-                    itemCount: _items.length,
-                    separatorBuilder: (_, _) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final item = _items[index];
-                      return _NotificationCard(
-                        notification: item,
-                        onTap: () => _open(item),
-                      );
-                    },
+                    children: [
+                      for (final group in ['Hoy', 'Esta semana', 'Más antiguas']) ...[
+                        if (_items.any((n) => _notificationGroup(n.createdAt) == group)) ...[
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(4, 12, 4, 12),
+                            child: Text(group, style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: DenuPeColors.text,
+                            )),
+                          ),
+                          for (final item in _items.where(
+                              (n) => _notificationGroup(n.createdAt) == group)) ...[
+                            _NotificationCard(
+                              notification: item,
+                              onTap: () => _open(item),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                        ],
+                      ],
+                    ],
                   ),
                 ),
         ),
@@ -207,3 +219,11 @@ class _NotificationCard extends StatelessWidget {
 
 String _fmt(DateTime d) =>
     '${d.day}/${d.month}/${d.year} ${d.hour}:${d.minute.toString().padLeft(2, '0')}';
+String _notificationGroup(DateTime created) {
+  final now = DateTime.now();
+  final today = DateTime(now.year, now.month, now.day);
+  final day = DateTime(created.year, created.month, created.day);
+  if (day == today) return 'Hoy';
+  if (today.difference(day).inDays < 7) return 'Esta semana';
+  return 'Más antiguas';
+}
