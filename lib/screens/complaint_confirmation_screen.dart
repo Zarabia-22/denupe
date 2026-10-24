@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/denupe_colors.dart';
+import '../widgets/location_preview.dart';
 import 'package:insforge_flutter/insforge_flutter.dart';
 
 import '../models.dart';
@@ -169,11 +170,15 @@ class _ComplaintConfirmationScreenState
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        Text('Resumen de la denuncia', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 12),
         _buildSummaryCard(),
         const SizedBox(height: 16),
         _buildEntityCard(autoridad),
-        const SizedBox(height: 24),
-        FilledButton.icon(
+        const SizedBox(height: 12),
+        Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(10)), child: const Row(children: [Icon(Icons.info_outline, color: DenuPeColors.primary), SizedBox(width: 8), Expanded(child: Text('Al confirmar, tu denuncia será enviada a la entidad correspondiente.'))])),
+        const SizedBox(height: 16),
+        Row(children: [OutlinedButton(onPressed: _confirming ? null : () => Navigator.of(context).pop(), child: const Text('Editar')), const SizedBox(width: 8), Expanded(child: FilledButton.icon(
           onPressed: (_confirming || autoridad == null) ? null : _confirm,
           style: FilledButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -186,7 +191,7 @@ class _ComplaintConfirmationScreenState
                 )
               : const Icon(Icons.check_circle_outline),
           label: const Text('Confirmar denuncia'),
-        ),
+        ))]),
         if (autoridad == null) ...[
           const SizedBox(height: 8),
           Text(
@@ -247,12 +252,43 @@ class _ComplaintConfirmationScreenState
                 detail:
                     '${widget.latitude!.toStringAsFixed(6)}, ${widget.longitude!.toStringAsFixed(6)}',
               ),
-            _SummaryRow(
-              label: 'Adjuntos',
-              detail: widget.media.isEmpty
-                  ? 'Ninguno'
-                  : '${widget.media.length} archivo(s)',
-            ),
+            const SizedBox(height: 12),
+            const Text('Ubicación', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            LocationPreview(height: 112),
+            if (widget.latitude != null && widget.longitude != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 6),
+                child: Text('Lat: ${widget.latitude!.toStringAsFixed(5)}, Lng: ${widget.longitude!.toStringAsFixed(5)}',
+                    style: Theme.of(context).textTheme.bodySmall),
+              ),
+            const SizedBox(height: 12),
+            Text('Evidencias (${widget.media.length})',
+                style: const TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            if (widget.media.isEmpty)
+              const Text('No se adjuntaron evidencias.')
+            else
+              SizedBox(
+                height: 78,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: widget.media.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (_, i) {
+                    final media = widget.media[i];
+                    return ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: media.mediaType == 'image'
+                          ? Image.memory(media.bytes, width: 76, height: 76, fit: BoxFit.cover)
+                          : Container(width: 76, height: 76,
+                              color: DenuPeColors.background,
+                              child: const Icon(Icons.videocam_outlined,
+                                  color: DenuPeColors.primary)),
+                    );
+                  },
+                ),
+              ),
           ],
         ),
       ),

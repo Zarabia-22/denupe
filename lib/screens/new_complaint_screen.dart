@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/denupe_colors.dart';
+import '../widgets/location_preview.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -337,16 +338,34 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        const _ComplaintSteps(),
+        const SizedBox(height: 20),
         Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (_profile != null) ..._buildContactSection(),
+
+              TextFormField(
+                controller: _title,
+                decoration: const InputDecoration(labelText: 'Título de la denuncia *', hintText: 'Escribe un título breve', prefixIcon: Icon(Icons.edit_outlined)),
+                maxLength: 100,
+                validator: (v) => v == null || v.trim().length < 5 ? 'Escribe al menos 5 caracteres' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _description,
+                decoration: const InputDecoration(labelText: 'Descripción *', hintText: 'Describe la situación...', alignLabelWithHint: true, prefixIcon: Icon(Icons.description_outlined)),
+                maxLength: 500,
+                minLines: 3,
+                maxLines: 5,
+                validator: (v) => v == null || v.trim().length < 10 ? 'Escribe al menos 10 caracteres' : null,
+              ),
+              const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _categoryId,
                 decoration: const InputDecoration(
-                  labelText: 'Categoría',
+                  labelText: 'Categoría *',
                   prefixIcon: Icon(Icons.category_outlined),
                 ),
                 items: _cats
@@ -359,50 +378,26 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                 validator: (v) => v == null ? 'Selecciona una categoría' : null,
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _title,
-                decoration: const InputDecoration(
-                  labelText: 'Título',
-                  prefixIcon: Icon(Icons.title),
-                ),
-                maxLength: 120,
-                validator: (v) =>
-                    (v == null || v.trim().length < 5)
-                        ? 'Describe el problema en pocas palabras'
-                        : null,
-              ),
+              const Text('Ubicación', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
-              TextFormField(
-                controller: _description,
-                decoration: const InputDecoration(
-                  labelText: 'Descripción',
-                  alignLabelWithHint: true,
-                ),
-                minLines: 3,
-                maxLines: 6,
-                validator: (v) =>
-                    (v == null || v.trim().length < 10)
-                        ? 'Da más detalles (mínimo 10 caracteres)'
-                        : null,
-              ),
-              const SizedBox(height: 16),
-              TextFormField(
-                controller: _address,
-                decoration: const InputDecoration(
-                  labelText: 'Dirección o referencia (opcional)',
-                  prefixIcon: Icon(Icons.place_outlined),
-                ),
-              ),
+              LocationPreview(),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: _captureLocation,
                 icon: const Icon(Icons.my_location),
-                label: _latitude != null && _longitude != null
-                    ? Text(
-                        'Ubicación: '
-                        '${_latitude!.toStringAsFixed(5)}, '
-                        '${_longitude!.toStringAsFixed(5)}')
-                    : const Text('Usar mi ubicación'),
+                label: const Text('Usar mi ubicación actual'),
+              ),
+              if (_latitude != null && _longitude != null)
+                Text('Lat: ${_latitude!.toStringAsFixed(5)}, Lng: ${_longitude!.toStringAsFixed(5)}',
+                    style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _address,
+                decoration: const InputDecoration(
+                  labelText: 'Dirección referencial (opcional)',
+                  hintText: 'Ej. Av. Los Olivos 123',
+                  prefixIcon: Icon(Icons.place_outlined),
+                ),
               ),
               const SizedBox(height: 24),
               Text('Adjuntos', style: Theme.of(context).textTheme.titleSmall),
@@ -432,14 +427,14 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              FilledButton.icon(
+              Row(children: [Expanded(child: OutlinedButton(onPressed: () { _formKey.currentState?.reset(); _title.clear(); _description.clear(); _address.clear(); setState(() { _latitude = null; _longitude = null; _media.clear(); }); }, child: const Text('Cancelar'))), const SizedBox(width: 8), Expanded(child: FilledButton.icon(
                 onPressed: !_profileComplete ? null : _submit,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                icon: const Icon(Icons.send),
-                label: const Text('Enviar denuncia'),
-              ),
+                icon: const Icon(Icons.arrow_forward),
+                label: const Text('Siguiente'),
+              ))]),
               if (!_profileComplete) ...[
                 const SizedBox(height: 8),
                 Text(
@@ -556,4 +551,32 @@ String _mimeFromName(String filename, String mediaType) {
   if (ext.endsWith('.m4v')) return 'video/x-m4v';
   if (ext.endsWith('.avi')) return 'video/x-msvideo';
   return 'video/mp4';
+}
+class _ComplaintSteps extends StatelessWidget {
+  const _ComplaintSteps();
+
+  @override
+  Widget build(BuildContext context) {
+    const steps = ['Datos', 'Ubicación', 'Evidencia', 'Revisar'];
+    return Row(
+      children: List.generate(steps.length, (index) {
+        return Expanded(
+          child: Column(
+            children: [
+              CircleAvatar(
+                radius: 15,
+                backgroundColor: index == 0 ? DenuPeColors.primary : DenuPeColors.background,
+                child: Text('${index + 1}', style: TextStyle(
+                  color: index == 0 ? DenuPeColors.surface : DenuPeColors.text,
+                  fontSize: 12,
+                )),
+              ),
+              const SizedBox(height: 6),
+              Text(steps[index], style: const TextStyle(fontSize: 11)),
+            ],
+          ),
+        );
+      }),
+    );
+  }
 }
