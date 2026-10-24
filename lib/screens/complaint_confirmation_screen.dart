@@ -169,11 +169,15 @@ class _ComplaintConfirmationScreenState
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        Text('Resumen de la denuncia', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 12),
         _buildSummaryCard(),
         const SizedBox(height: 16),
         _buildEntityCard(autoridad),
-        const SizedBox(height: 24),
-        FilledButton.icon(
+        const SizedBox(height: 12),
+        Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(10)), child: const Row(children: [Icon(Icons.info_outline, color: DenuPeColors.primary), SizedBox(width: 8), Expanded(child: Text('Al confirmar, tu denuncia será enviada a la entidad correspondiente.'))])),
+        const SizedBox(height: 16),
+        Row(children: [OutlinedButton(onPressed: _confirming ? null : () => Navigator.of(context).pop(), child: const Text('Editar')), const SizedBox(width: 8), Expanded(child: FilledButton.icon(
           onPressed: (_confirming || autoridad == null) ? null : _confirm,
           style: FilledButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -186,7 +190,7 @@ class _ComplaintConfirmationScreenState
                 )
               : const Icon(Icons.check_circle_outline),
           label: const Text('Confirmar denuncia'),
-        ),
+        ))]),
         if (autoridad == null) ...[
           const SizedBox(height: 8),
           Text(
