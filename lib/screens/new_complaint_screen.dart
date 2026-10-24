@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../theme/denupe_colors.dart';
+import '../widgets/location_preview.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -344,7 +345,23 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              if (_profile != null) ..._buildContactSection(),
+
+              TextFormField(
+                controller: _title,
+                decoration: const InputDecoration(labelText: 'Título de la denuncia *', hintText: 'Escribe un título breve', prefixIcon: Icon(Icons.edit_outlined)),
+                maxLength: 100,
+                validator: (v) => v == null || v.trim().length < 5 ? 'Escribe al menos 5 caracteres' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _description,
+                decoration: const InputDecoration(labelText: 'Descripción *', hintText: 'Describe la situación...', alignLabelWithHint: true, prefixIcon: Icon(Icons.description_outlined)),
+                maxLength: 500,
+                minLines: 3,
+                maxLines: 5,
+                validator: (v) => v == null || v.trim().length < 10 ? 'Escribe al menos 10 caracteres' : null,
+              ),
+              const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _categoryId,
                 decoration: const InputDecoration(
@@ -361,35 +378,20 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                 validator: (v) => v == null ? 'Selecciona una categoría' : null,
               ),
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _title,
-                decoration: const InputDecoration(
-                  labelText: 'Título de la denuncia *',
-                  hintText: 'Escribe un título breve',
-                  prefixIcon: Icon(Icons.title),
-                ),
-                maxLength: 120,
-                validator: (v) =>
-                    (v == null || v.trim().length < 5)
-                        ? 'Describe el problema en pocas palabras'
-                        : null,
-              ),
+              const SizedBox(height: 14),
+              const Text('Ubicación', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
-              TextFormField(
-                controller: _description,
-                decoration: const InputDecoration(
-                  labelText: 'Descripción *',
-                  hintText: 'Describe la situación...',
-                  alignLabelWithHint: true,
-                ),
-                minLines: 3,
-                maxLines: 6,
-                validator: (v) =>
-                    (v == null || v.trim().length < 10)
-                        ? 'Da más detalles (mínimo 10 caracteres)'
-                        : null,
+              LocationPreview(),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: _captureLocation,
+                icon: const Icon(Icons.my_location),
+                label: const Text('Usar mi ubicación actual'),
               ),
-              const SizedBox(height: 16),
+              if (_latitude != null && _longitude != null)
+                Text('Lat: ${_latitude!.toStringAsFixed(5)}, Lng: ${_longitude!.toStringAsFixed(5)}',
+                    style: Theme.of(context).textTheme.bodySmall),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _address,
                 decoration: const InputDecoration(
@@ -399,16 +401,6 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              OutlinedButton.icon(
-                onPressed: _captureLocation,
-                icon: const Icon(Icons.my_location),
-                label: _latitude != null && _longitude != null
-                    ? Text(
-                        'Ubicación: '
-                        '${_latitude!.toStringAsFixed(5)}, '
-                        '${_longitude!.toStringAsFixed(5)}')
-                    : const Text('Usar mi ubicación actual'),
-              ),
               const SizedBox(height: 24),
               Text('Adjuntos', style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 4),
@@ -437,14 +429,14 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              FilledButton.icon(
+              Row(children: [Expanded(child: OutlinedButton(onPressed: () { _formKey.currentState?.reset(); _title.clear(); _description.clear(); _address.clear(); }, child: const Text('Cancelar'))), const SizedBox(width: 8), Expanded(child: FilledButton.icon(
                 onPressed: !_profileComplete ? null : _submit,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 icon: const Icon(Icons.arrow_forward),
                 label: const Text('Siguiente'),
-              ),
+              ))]),
               if (!_profileComplete) ...[
                 const SizedBox(height: 8),
                 Text(
