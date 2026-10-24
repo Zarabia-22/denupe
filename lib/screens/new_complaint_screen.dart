@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../theme/denupe_colors.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:image_picker/image_picker.dart';
 
@@ -257,10 +259,10 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.12),
+                    color: DenuPeColors.warning.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: Colors.orange.withValues(alpha: 0.4),
+                      color: DenuPeColors.warning.withValues(alpha: 0.4),
                     ),
                   ),
                   child: Column(
