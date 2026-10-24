@@ -16,7 +16,7 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _index = 0;
+  int _index = 1;
   int _notificationsTick = 0;
   bool _isStaff = false;
 
@@ -37,7 +37,7 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!mounted) return;
       setState(() {
         _isStaff = profile.isFuncionario;
-        if (!_isStaff && _index > 3) _index = 0;
+        if (!_isStaff && _index > 3) _index = 1;
       });
     } catch (_) {
       // Sin rol conocido: no se muestra el panel.
