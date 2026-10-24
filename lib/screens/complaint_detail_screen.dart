@@ -359,6 +359,7 @@ class _StatusBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _statusColor(status);
+    final textColor = status == 'en_proceso' ? DenuPeColors.text : color;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -613,7 +614,7 @@ Color _statusColor(String status) {
     case 'en_revision':
       return DenuPeColors.primary;
     case 'en_proceso':
-      return DenuPeColors.warningText;
+      return DenuPeColors.warning;
     case 'resuelta':
       return DenuPeColors.success;
     case 'rechazada':
