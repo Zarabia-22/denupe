@@ -123,9 +123,9 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
       Expanded(child: RefreshIndicator(
       onRefresh: _load,
       child: ListView.separated(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
         itemCount: filtered.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 8),
+        separatorBuilder: (_, _) => const SizedBox(height: 10),
         itemBuilder: (context, index) {
           final item = filtered[index];
           return _ComplaintCard(
@@ -157,104 +157,69 @@ class _ComplaintCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final date = complaint.createdAt;
-    final dateText = '${date.day}/${date.month}/${date.year}';
+    final dateText = '${date.day} ${_monthName(date.month)} ${date.year}';
     return Card(
+      margin: EdgeInsets.zero,
+      color: DenuPeColors.surface,
+      elevation: 0,
       clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: DenuPeColors.border),
+      ),
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
+          padding: const EdgeInsets.all(10),
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 66,
-                    height: 74,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFE3F2FD),
-                      borderRadius: BorderRadius.circular(9),
+              _ComplaintThumbnail(complaintId: complaint.id),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      complaint.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: DenuPeColors.text,
+                      ),
                     ),
-                    child: const Icon(Icons.report_problem_outlined,
-                        color: DenuPeColors.primary, size: 30),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                    const SizedBox(height: 5),
+                    Text(
+                      'Código: #${complaint.id.length > 8 ? complaint.id.substring(0, 8) : complaint.id}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
+                    ),
+                    const SizedBox(height: 10),
+                    Row(
                       children: [
-                        Text(complaint.title,
-                            maxLines: 2,
+                        const Icon(Icons.calendar_today_outlined,
+                            size: 12, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(dateText,
+                            maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 15,
-                                fontWeight: FontWeight.w600)),
-                        const SizedBox(height: 6),
-                        Text('Código: #${complaint.id.length > 8 ? complaint.id.substring(0, 8) : complaint.id}',
-                            style: Theme.of(context).textTheme.bodySmall),
-                        const SizedBox(height: 8),
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                        ),
+                        const SizedBox(width: 4),
                         _StatusChip(status: complaint.status),
                       ],
                     ),
-                  ),
-                  const Icon(Icons.chevron_right, color: DenuPeColors.text),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                categoryName,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  Icon(Icons.account_balance_outlined,
-                      size: 14, color: Colors.grey.shade600),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      authorityName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                complaint.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(Icons.calendar_today,
-                      size: 14, color: Colors.grey.shade600),
-                  const SizedBox(width: 4),
-                  Text(
-                    dateText,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  if (complaint.address != null &&
-                      complaint.address!.isNotEmpty) ...[
-                    const SizedBox(width: 12),
-                    Icon(Icons.place_outlined,
-                        size: 14, color: Colors.grey.shade600),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        complaint.address!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ),
                   ],
-                ],
+                ),
+              ),
+              const SizedBox(width: 3),
+              const Padding(
+                padding: EdgeInsets.only(top: 25),
+                child: Icon(Icons.chevron_right, size: 19, color: Color(0xFF64748B)),
               ),
             ],
           ),
@@ -262,6 +227,82 @@ class _ComplaintCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _monthName(int month) {
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun',
+    'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  return months[month - 1];
+}
+
+/// Obtiene la primera evidencia real, si existe, del almacenamiento privado.
+class _ComplaintThumbnail extends StatefulWidget {
+  const _ComplaintThumbnail({required this.complaintId});
+  final String complaintId;
+
+  @override
+  State<_ComplaintThumbnail> createState() => _ComplaintThumbnailState();
+}
+
+class _ComplaintThumbnailState extends State<_ComplaintThumbnail> {
+  late Future<String?> _imageUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _imageUrl = _loadImage();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ComplaintThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.complaintId != widget.complaintId) {
+      _imageUrl = _loadImage();
+    }
+  }
+
+  Future<String?> _loadImage() async {
+    try {
+      final media = await api.complaintMedia(widget.complaintId);
+      for (final item in media) {
+        if (item.isImage) {
+          return await api.complaintMediaSignedUrl(item.storageKey);
+        }
+      }
+    } catch (_) {
+      // La falta de una miniatura no debe impedir ver la denuncia.
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: 76,
+        height: 80,
+        child: FutureBuilder<String?>(
+          future: _imageUrl,
+          builder: (context, snapshot) {
+            final url = snapshot.data;
+            if (url == null) return _placeholder();
+            return Image.network(
+              url,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => _placeholder(),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _placeholder() => Container(
+    color: const Color(0xFFE3F2FD),
+    child: const Icon(Icons.image_outlined,
+        color: DenuPeColors.primary, size: 30),
+  );
 }
 
 class _StatusChip extends StatelessWidget {
@@ -273,15 +314,15 @@ class _StatusChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final color = _statusColor(status);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
+
       ),
       child: Text(
         statusLabel(status),
-        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+        style: TextStyle(color: color, fontSize: 10, fontWeight: FontWeight.w600),
       ),
     );
   }
