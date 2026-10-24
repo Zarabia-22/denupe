@@ -357,12 +357,22 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
         ),
       );
     }
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return Column(
       children: [
-        _ComplaintSteps(activeStep: _activeStep),
-        const SizedBox(height: 20),
-        Form(
+        // El indicador permanece visible mientras el formulario se desplaza.
+        Material(
+          color: DenuPeColors.surface,
+          elevation: 1,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+            child: _ComplaintSteps(activeStep: _activeStep),
+          ),
+        ),
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Form(
           key: _formKey,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -472,6 +482,9 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                       ?.copyWith(color: Colors.grey.shade600),
                 ),
               ],
+            ],
+          ),
+              ),
             ],
           ),
         ),
