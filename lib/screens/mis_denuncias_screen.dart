@@ -168,17 +168,37 @@ class _ComplaintCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  Container(
+                    width: 66,
+                    height: 74,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFE3F2FD),
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: const Icon(Icons.report_problem_outlined,
+                        color: DenuPeColors.primary, size: 30),
+                  ),
+                  const SizedBox(width: 12),
                   Expanded(
-                    child: Text(
-                      complaint.title,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(complaint.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 15,
+                                fontWeight: FontWeight.w600)),
+                        const SizedBox(height: 6),
+                        Text('Código: #${complaint.id.length > 8 ? complaint.id.substring(0, 8) : complaint.id}',
+                            style: Theme.of(context).textTheme.bodySmall),
+                        const SizedBox(height: 8),
+                        _StatusChip(status: complaint.status),
+                      ],
                     ),
                   ),
-                  _StatusChip(status: complaint.status),
+                  const Icon(Icons.chevron_right, color: DenuPeColors.text),
                 ],
               ),
               const SizedBox(height: 6),
