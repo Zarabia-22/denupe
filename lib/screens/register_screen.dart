@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import '../theme/denupe_colors.dart';
 import 'package:insforge_flutter/insforge_flutter.dart';
 
 import '../services/app_scope.dart';
@@ -20,6 +22,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _otp = TextEditingController();
   bool _loading = false;
   bool _awaitingVerification = false;
+  bool _verified = false;
+  bool _showPassword = false;
+  bool _showConfirm = false;
+  bool _accepted = false;
 
   @override
   void dispose() {
@@ -68,8 +74,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // pero RegisterScreen sigue pusheada encima de AuthGate: hay que
       // regresar a la raíz para que el menú principal quede visible.
       if (!mounted) return;
-      _showMessage('Correo verificado, bienvenido');
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      setState(() => _verified = true);
     } on InsforgeException catch (e) {
       _showMessage(e.message);
     } catch (_) {
@@ -102,15 +107,18 @@ class _RegisterScreenState extends State<RegisterScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Crear cuenta')),
+      appBar: AppBar(title: const Text('DenuPe', style: TextStyle(fontWeight: FontWeight.bold)), backgroundColor: DenuPeColors.primary, foregroundColor: Colors.white),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
+          padding: const EdgeInsets.all(20),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: _awaitingVerification
-                ? _buildVerification(theme)
-                : _buildForm(theme),
+            constraints: const BoxConstraints(maxWidth: 440),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 28),
+              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(24)),
+              child: _verified ? _buildSuccess() : _awaitingVerification
+                ? _buildVerification(theme) : _buildForm(theme),
+            ),
           ),
         ),
       ),
@@ -124,10 +132,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          _intro(Icons.person_add_alt_1_rounded, 'Crea tu cuenta', 'Regístrate para comenzar a reportar problemas en tu ciudad.'),
+          const SizedBox(height: 28),
           TextFormField(
             controller: _name,
             decoration: const InputDecoration(
-              labelText: 'Nombre completo',
+              labelText: 'Nombre completo', hintText: 'Tu nombre y apellidos',
               prefixIcon: Icon(Icons.person_outline),
             ),
             validator: (v) =>
@@ -137,7 +147,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           TextFormField(
             controller: _email,
             decoration: const InputDecoration(
-              labelText: 'Correo electrónico',
+              labelText: 'Correo electrónico', hintText: 'tu@email.com',
               prefixIcon: Icon(Icons.mail_outline),
             ),
             keyboardType: TextInputType.emailAddress,
@@ -150,28 +160,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
           TextFormField(
             controller: _password,
             decoration: const InputDecoration(
-              labelText: 'Contraseña',
+              labelText: 'Contraseña', hintText: 'Mínimo 8 caracteres', suffixIcon: IconButton(icon: Icon(_showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined), onPressed: () => setState(() => _showPassword = !_showPassword)),
               prefixIcon: Icon(Icons.lock_outline),
             ),
-            obscureText: true,
-            validator: (v) => (v == null || v.length < 6)
-                ? 'Mínimo 6 caracteres'
+            obscureText: !_showPassword,
+            validator: (v) => (v == null || v.length < 8)
+                ? 'Mínimo 8 caracteres'
                 : null,
           ),
           const SizedBox(height: 16),
           TextFormField(
             controller: _confirm,
             decoration: const InputDecoration(
-              labelText: 'Confirmar contraseña',
+              labelText: 'Confirmar contraseña', hintText: 'Repite tu contraseña', suffixIcon: IconButton(icon: Icon(_showConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined), onPressed: () => setState(() => _showConfirm = !_showConfirm)),
               prefixIcon: Icon(Icons.lock_outline),
             ),
-            obscureText: true,
+            obscureText: !_showConfirm,
             validator: (v) =>
                 (v != _password.text) ? 'Las contraseñas no coinciden' : null,
           ),
+          CheckboxListTile(contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.leading, activeColor: DenuPeColors.primary, value: _accepted, onChanged: (v) => setState(() => _accepted = v ?? false), title: const Text('Acepto los términos de uso y la política de privacidad', style: TextStyle(fontSize: 13))),
           const SizedBox(height: 24),
           FilledButton(
-            onPressed: _loading ? null : _submit,
+            onPressed: (_loading || !_accepted) ? null : _submit,
             style: FilledButton.styleFrom(
               padding: const EdgeInsets.symmetric(vertical: 16),
             ),
@@ -181,65 +192,37 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     height: 20,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
-                : const Text('Registrarme'),
+                : const Text('Registrarse'),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildVerification(ThemeData theme) {
-    return Form(
-      key: _otpKey,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Icon(Icons.mark_email_read_outlined,
-              size: 56, color: theme.colorScheme.primary),
-          const SizedBox(height: 12),
-          const Text(
-            'Verificación',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Enviamos un código a ${_email.text.trim()}',
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 24),
-          TextFormField(
-            controller: _otp,
-            decoration: const InputDecoration(
-              labelText: 'Código de verificación',
-              prefixIcon: Icon(Icons.pin_outlined),
-            ),
-            keyboardType: TextInputType.number,
-            validator: (v) =>
-                (v == null || v.length < 4) ? 'Ingresa el código' : null,
-          ),
-          const SizedBox(height: 16),
-          FilledButton(
-            onPressed: _loading ? null : _verifyOtp,
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-            ),
-            child: _loading
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('Verificar'),
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: _loading ? null : _resendCode,
-            child: const Text('Reenviar código'),
-          ),
-        ],
-      ),
-    );
-  }
+  Widget _intro(IconData icon, String title, String subtitle, {Color color = DenuPeColors.primary}) => Column(children: [
+    CircleAvatar(radius: 44, backgroundColor: color.withValues(alpha: 0.12), child: Icon(icon, color: color, size: 44)),
+    const SizedBox(height: 18),
+    Text(title, textAlign: TextAlign.center, style: const TextStyle(fontSize: 25, fontWeight: FontWeight.bold, color: DenuPeColors.text)),
+    const SizedBox(height: 10),
+    Text(subtitle, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, height: 1.5)),
+  ]);
+  Widget _buildVerification(ThemeData theme) => Form(key: _otpKey, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+    _intro(Icons.mark_email_unread_outlined, 'Verifica tu correo', 'Hemos enviado un código de verificación a ' + _email.text.trim()),
+    const SizedBox(height: 24),
+    const Text('Ingresa el código de 6 dígitos para completar tu registro.', textAlign: TextAlign.center),
+    const SizedBox(height: 24),
+    TextFormField(controller: _otp, autofocus: true, textAlign: TextAlign.center, keyboardType: TextInputType.number, maxLength: 6, inputFormatters: [FilteringTextInputFormatter.digitsOnly], style: const TextStyle(fontSize: 26, letterSpacing: 10, fontWeight: FontWeight.bold), decoration: const InputDecoration(hintText: '••••••', counterText: '', border: OutlineInputBorder()), validator: (v) => v == null || v.length != 6 ? 'Ingresa los 6 dígitos' : null),
+    const SizedBox(height: 18),
+    const Text('¿No recibiste el código?', textAlign: TextAlign.center),
+    TextButton(onPressed: _loading ? null : _resendCode, child: const Text('Reenviar código')),
+    const SizedBox(height: 24),
+    FilledButton(onPressed: _loading ? null : _verifyOtp, style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)), child: _loading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Verificar')),
+  ]));
+  Widget _buildSuccess() => Column(children: [
+    const SizedBox(height: 65),
+    _intro(Icons.check_circle_rounded, '¡Cuenta verificada!', 'Tu cuenta ha sido creada correctamente. Ahora puedes comenzar a usar DenuPe para reportar problemas en tu ciudad.', color: DenuPeColors.success),
+    const SizedBox(height: 110),
+    SizedBox(width: double.infinity, child: FilledButton(onPressed: () => Navigator.of(context).popUntil((route) => route.isFirst), style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)), child: const Text('Continuar →'))),
+    const SizedBox(height: 25),
+  ]);
 }
