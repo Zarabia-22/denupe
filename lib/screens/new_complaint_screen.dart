@@ -378,7 +378,6 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                 validator: (v) => v == null ? 'Selecciona una categoría' : null,
               ),
               const SizedBox(height: 16),
-              const SizedBox(height: 14),
               const Text('Ubicación', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               LocationPreview(),
@@ -400,7 +399,6 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                   prefixIcon: Icon(Icons.place_outlined),
                 ),
               ),
-              const SizedBox(height: 8),
               const SizedBox(height: 24),
               Text('Adjuntos', style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 4),
@@ -429,7 +427,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Row(children: [Expanded(child: OutlinedButton(onPressed: () { _formKey.currentState?.reset(); _title.clear(); _description.clear(); _address.clear(); }, child: const Text('Cancelar'))), const SizedBox(width: 8), Expanded(child: FilledButton.icon(
+              Row(children: [Expanded(child: OutlinedButton(onPressed: () { _formKey.currentState?.reset(); _title.clear(); _description.clear(); _address.clear(); setState(() { _latitude = null; _longitude = null; _media.clear(); }); }, child: const Text('Cancelar'))), const SizedBox(width: 8), Expanded(child: FilledButton.icon(
                 onPressed: !_profileComplete ? null : _submit,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
