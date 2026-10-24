@@ -158,62 +158,45 @@ class _NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final unread = !notification.isRead;
+    final text = '${notification.title} ${notification.body ?? ''}'.toLowerCase();
+    final rejected = text.contains('rechaz') || text.contains('error');
+    final resolved = text.contains('resuelt') || text.contains('atendid');
+    final progress = text.contains('proceso') || text.contains('revisi');
+    final color = rejected ? DenuPeColors.error
+        : resolved ? DenuPeColors.success
+        : progress ? DenuPeColors.warningText : DenuPeColors.primary;
+    final background = rejected ? const Color(0xFFFCE8E6)
+        : resolved ? const Color(0xFFE7F4E9)
+        : progress ? const Color(0xFFFFF4D6) : const Color(0xFFE3F2FD);
+    final icon = rejected ? Icons.cancel_outlined
+        : resolved ? Icons.check_circle_outline
+        : progress ? Icons.pending_outlined : Icons.notifications_active_outlined;
     return Card(
+      color: background,
+      margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.all(14),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(
-                unread
-                    ? Icons.notifications_active
-                    : Icons.notifications_none,
-                color: unread
-                    ? Theme.of(context).colorScheme.primary
-                    : Colors.grey,
-              ),
+              CircleAvatar(backgroundColor: color, child: Icon(icon, color: Colors.white)),
               const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      notification.title,
-                      style: TextStyle(
-                        fontWeight:
-                            unread ? FontWeight.bold : FontWeight.normal,
-                      ),
-                    ),
-                    if (notification.body != null &&
-                        notification.body!.isNotEmpty) ...[
-                      const SizedBox(height: 2),
-                      Text(
-                        notification.body!,
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ],
+              Expanded(child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(notification.title, style: const TextStyle(fontWeight: FontWeight.bold, color: DenuPeColors.text)),
+                  if (notification.body != null && notification.body!.isNotEmpty) ...[
                     const SizedBox(height: 4),
-                    Text(
-                      _fmt(notification.createdAt),
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
+                    Text(notification.body!, style: const TextStyle(color: DenuPeColors.text)),
                   ],
-                ),
-              ),
-              if (unread)
-                Container(
-                  width: 10,
-                  height: 10,
-                  margin: const EdgeInsets.only(top: 6, left: 8),
-                  decoration: const BoxDecoration(
-                    color: DenuPeColors.primary,
-                    shape: BoxShape.circle,
-                  ),
-                ),
+                  const SizedBox(height: 6),
+                  Text(_fmt(notification.createdAt), style: TextStyle(fontSize: 12, color: color)),
+                ],
+              )),
+              const Icon(Icons.chevron_right, color: DenuPeColors.text),
             ],
           ),
         ),
