@@ -260,13 +260,13 @@ class _StatusChip extends StatelessWidget {
 Color _statusColor(String status) {
   switch (status) {
     case 'en_revision':
-      return const DenuPeColors.primary;
+      return DenuPeColors.primary;
     case 'en_proceso':
-      return const DenuPeColors.warningText;
+      return DenuPeColors.warningText;
     case 'resuelta':
-      return const DenuPeColors.success;
+      return DenuPeColors.success;
     case 'rechazada':
-      return const DenuPeColors.error;
+      return DenuPeColors.error;
     case 'archivada':
       return Colors.grey;
     default: // recibida
