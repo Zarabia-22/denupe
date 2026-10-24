@@ -141,7 +141,19 @@ class _ComplaintConfirmationScreenState
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('Confirmar denuncia')),
-      body: _buildBody(),
+      body: Column(
+        children: [
+          const Material(
+            color: DenuPeColors.surface,
+            elevation: 1,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: _ReviewSteps(),
+            ),
+          ),
+          Expanded(child: _buildBody()),
+        ],
+      ),
     );
   }
 
@@ -386,6 +398,68 @@ class _SummaryRow extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+class _ReviewSteps extends StatelessWidget {
+  const _ReviewSteps();
+
+  @override
+  Widget build(BuildContext context) {
+    const labels = ['Datos', 'Ubicación', 'Evidencia', 'Revisar'];
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (var index = 0; index < labels.length; index++) ...[
+          Expanded(
+            child: Column(
+              children: [
+                Container(
+                  width: 26,
+                  height: 26,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: index == 3
+                        ? DenuPeColors.primary
+                        : DenuPeColors.surface,
+                    border: Border.all(
+                      color: DenuPeColors.primary,
+                      width: 1.5,
+                    ),
+                  ),
+                  child: index < 3
+                      ? const Icon(Icons.check, size: 15,
+                          color: DenuPeColors.primary)
+                      : const Text('4', style: TextStyle(
+                          color: DenuPeColors.surface,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12)),
+                ),
+                const SizedBox(height: 6),
+                Text(labels[index],
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: index == 3
+                        ? DenuPeColors.primary : DenuPeColors.text,
+                    fontWeight: index == 3
+                        ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (index < labels.length - 1)
+            const Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(top: 12),
+                child: SizedBox(height: 2,
+                  child: ColoredBox(color: DenuPeColors.primary)),
+              ),
+            ),
+        ],
+      ],
     );
   }
 }
