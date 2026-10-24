@@ -176,7 +176,7 @@ class _NotificationCard extends StatelessWidget {
     final progress = text.contains('proceso') || text.contains('revisi');
     final color = rejected ? DenuPeColors.error
         : resolved ? DenuPeColors.success
-        : progress ? DenuPeColors.warningText : DenuPeColors.primary;
+        : progress ? DenuPeColors.warning : DenuPeColors.primary;
     final background = rejected ? const Color(0xFFFCE8E6)
         : resolved ? const Color(0xFFE7F4E9)
         : progress ? const Color(0xFFFFF4D6) : const Color(0xFFE3F2FD);
@@ -194,7 +194,13 @@ class _NotificationCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(backgroundColor: color, child: Icon(icon, color: Colors.white)),
+              CircleAvatar(
+                backgroundColor: color,
+                child: Icon(icon,
+                  color: progress && !rejected && !resolved
+                      ? DenuPeColors.text
+                      : Colors.white),
+              ),
               const SizedBox(width: 12),
               Expanded(child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
