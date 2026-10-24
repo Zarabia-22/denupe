@@ -19,6 +19,7 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
   List<Authority> _autoridades = [];
   final Set<String> _subscribed = {};
   bool _loading = true;
+  String _filter = 'Todas';
   String? _error;
 
   @override
@@ -111,14 +112,22 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
         detail: 'Toca "Nueva" para reportar un problema en tu ciudad.',
       );
     }
-    return RefreshIndicator(
+    final filtered = _complaints.where((c) {
+      if (_filter == 'En proceso') return c.status == 'en_proceso' || c.status == 'en_revision';
+      if (_filter == 'Resueltas') return c.status == 'resuelta';
+      if (_filter == 'Rechazadas') return c.status == 'rechazada';
+      return true;
+    }).toList();
+    return Column(children: [
+      SingleChildScrollView(scrollDirection: Axis.horizontal, padding: const EdgeInsets.all(12), child: Row(children: ['Todas', 'En proceso', 'Resueltas', 'Rechazadas'].map((name) => Padding(padding: const EdgeInsets.only(right: 6), child: ChoiceChip(label: Text(name), selected: _filter == name, onSelected: (_) => setState(() => _filter = name)))).toList())),
+      Expanded(child: RefreshIndicator(
       onRefresh: _load,
       child: ListView.separated(
         padding: const EdgeInsets.all(12),
-        itemCount: _complaints.length,
+        itemCount: filtered.length,
         separatorBuilder: (_, _) => const SizedBox(height: 8),
         itemBuilder: (context, index) {
-          final item = _complaints[index];
+          final item = filtered[index];
           return _ComplaintCard(
             complaint: item,
             categoryName: categoryNameOf(_cats, item.categoryId),
@@ -127,7 +136,8 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
           );
         },
       ),
-    );
+    )),
+    ]);
   }
 }
 
@@ -270,7 +280,7 @@ Color _statusColor(String status) {
     case 'archivada':
       return Colors.grey;
     default: // recibida
-      return Colors.blueGrey;
+      return DenuPeColors.primary;
   }
 }
 
