@@ -89,18 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text('DenuPe', style: TextStyle(fontWeight: FontWeight.bold)),
-            Text(
-              _isStaff
-                  ? ['Mis denuncias', 'Panel', 'Notificaciones', 'Perfil'][_index]
-                  : ['Nueva denuncia', 'Mis denuncias', 'Notificaciones', 'Perfil'][_index],
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.normal),
-            ),
-          ],
-        ),
+        title: const Text('DenuPe', style: TextStyle(fontWeight: FontWeight.bold)),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
