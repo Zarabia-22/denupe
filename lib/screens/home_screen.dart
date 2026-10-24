@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/app_scope.dart';
+import '../theme/denupe_colors.dart';
 import 'mis_denuncias_screen.dart';
 import 'new_complaint_screen.dart';
 import 'notifications_screen.dart';
@@ -88,7 +89,18 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('DenuPe'),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('DenuPe', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text(
+              _isStaff
+                  ? ['Mis denuncias', 'Panel', 'Notificaciones', 'Perfil'][_index]
+                  : ['Nueva denuncia', 'Mis denuncias', 'Notificaciones', 'Perfil'][_index],
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.normal),
+            ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -100,10 +112,10 @@ class _HomeScreenState extends State<HomeScreen> {
       body: IndexedStack(
         index: _index,
         children: [
+          if (!_isStaff)
+            NuevaDenunciaScreen(onCreated: () => setState(() => _index = 1)),
           const MisDenunciasScreen(),
           if (_isStaff) const PanelMunicipalScreen(),
-          if (!_isStaff)
-            NuevaDenunciaScreen(onCreated: () => setState(() => _index = 0)),
           NotificacionesScreen(tick: _notificationsTick),
           const ProfileScreen(),
         ],
@@ -112,6 +124,12 @@ class _HomeScreenState extends State<HomeScreen> {
         selectedIndex: _index,
         onDestinationSelected: (value) => setState(() => _index = value),
         destinations: [
+          if (!_isStaff)
+            const NavigationDestination(
+              icon: Icon(Icons.add_circle_outline),
+              selectedIcon: Icon(Icons.add_circle),
+              label: 'Nueva',
+            ),
           const NavigationDestination(
             icon: Icon(Icons.list_alt_outlined),
             selectedIcon: Icon(Icons.list_alt),
@@ -123,16 +141,10 @@ class _HomeScreenState extends State<HomeScreen> {
               selectedIcon: Icon(Icons.badge),
               label: 'Panel',
             ),
-          if (!_isStaff)
-            const NavigationDestination(
-              icon: Icon(Icons.add_circle_outline),
-              selectedIcon: Icon(Icons.add_circle),
-              label: 'Nueva',
-            ),
           const NavigationDestination(
             icon: Icon(Icons.notifications_outlined),
             selectedIcon: Icon(Icons.notifications),
-            label: 'Alertas',
+            label: 'Notificaciones',
           ),
           const NavigationDestination(
             icon: Icon(Icons.person_outline),
