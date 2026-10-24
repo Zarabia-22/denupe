@@ -347,7 +347,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
           children: [
             const Icon(Icons.cloud_off, size: 48),
             const SizedBox(height: 12),
-            const Text('No se pudieron cargar las categorías'),
+            const Text('No se pudieron cargar las categorías', textAlign: TextAlign.center),
             const SizedBox(height: 12),
             FilledButton.tonal(
               onPressed: _loadCategories,

@@ -421,21 +421,23 @@ class _StatusMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340),
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 56, color: Colors.grey.shade400),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Text(title,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                     fontSize: 16, fontWeight: FontWeight.w600)),
             if (detail != null) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 10),
               Text(detail!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 14, height: 1.45)),
             ],
             if (retryLabel != null && onRetry != null) ...[
               const SizedBox(height: 16),
@@ -445,6 +447,7 @@ class _StatusMessage extends StatelessWidget {
               ),
             ],
           ],
+          ),
         ),
       ),
     );
