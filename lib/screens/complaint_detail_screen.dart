@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+
+import '../theme/denupe_colors.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../models.dart';
@@ -100,7 +102,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
           children: [
             const Icon(Icons.cloud_off, size: 48),
             const SizedBox(height: 12),
-            const Text('No se pudo cargar la denuncia'),
+            const Text('No se pudo cargar la denuncia', textAlign: TextAlign.center),
             const SizedBox(height: 12),
             FilledButton.tonal(onPressed: _load, child: const Text('Reintentar')),
           ],
@@ -109,7 +111,12 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
     }
     final complaint = _complaint;
     if (complaint == null) {
-      return const Center(child: Text('Denuncia no encontrada'));
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24),
+          child: Text('Denuncia no encontrada', textAlign: TextAlign.center),
+        ),
+      );
     }
     return RefreshIndicator(
       onRefresh: _load,
@@ -357,6 +364,7 @@ class _StatusBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _statusColor(status);
+    final textColor = status == 'en_proceso' ? DenuPeColors.text : color;
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -371,7 +379,7 @@ class _StatusBanner extends StatelessWidget {
           Text(
             'Estado: ${statusLabel(status)}',
             style: TextStyle(
-              color: color,
+              color: textColor,
               fontSize: 16,
               fontWeight: FontWeight.w600,
             ),
@@ -609,13 +617,13 @@ class _HistoryTile extends StatelessWidget {
 Color _statusColor(String status) {
   switch (status) {
     case 'en_revision':
-      return const Color(0xFF1565C0);
+      return DenuPeColors.primary;
     case 'en_proceso':
-      return const Color(0xFFEF6C00);
+      return DenuPeColors.warning;
     case 'resuelta':
-      return const Color(0xFF2E7D32);
+      return DenuPeColors.success;
     case 'rechazada':
-      return const Color(0xFFC62828);
+      return DenuPeColors.error;
     case 'archivada':
       return Colors.grey;
     default:

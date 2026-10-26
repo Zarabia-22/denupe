@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/denupe_colors.dart';
+
 import '../models.dart';
 import '../services/app_scope.dart';
 import 'complaint_detail_screen.dart';
@@ -17,6 +19,7 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
   List<Authority> _autoridades = [];
   final Set<String> _subscribed = {};
   bool _loading = true;
+  String _filter = 'Todas';
   String? _error;
 
   @override
@@ -88,43 +91,102 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
     _load();
   }
 
+  bool _matchesFilter(Complaint complaint) {
+    switch (_filter) {
+      case 'En proceso':
+        return complaint.status == 'en_proceso' ||
+            complaint.status == 'en_revision';
+      case 'Resueltas':
+        return complaint.status == 'resuelta';
+      case 'Rechazadas':
+        return complaint.status == 'rechazada';
+      default:
+        return true;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_error != null) {
-      return _StatusMessage(
-        icon: Icons.cloud_off,
-        title: 'No se pudieron cargar las denuncias',
-        detail: _error!,
-        retryLabel: 'Reintentar',
-        onRetry: _load,
-      );
-    }
-    if (_complaints.isEmpty) {
-      return const _StatusMessage(
-        icon: Icons.inbox_outlined,
-        title: 'Aún no tienes denuncias',
-        detail: 'Toca "Nueva" para reportar un problema en tu ciudad.',
-      );
-    }
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView.separated(
-        padding: const EdgeInsets.all(12),
-        itemCount: _complaints.length,
-        separatorBuilder: (_, _) => const SizedBox(height: 8),
-        itemBuilder: (context, index) {
-          final item = _complaints[index];
-          return _ComplaintCard(
-            complaint: item,
-            categoryName: categoryNameOf(_cats, item.categoryId),
-            authorityName: authorityNameOf(_autoridades, item.autoridadId),
-            onTap: () => _openDetail(item),
-          );
-        },
-      ),
+    final filtered = _complaints.where(_matchesFilter).toList();
+    const filters = ['Todas', 'En proceso', 'Resueltas', 'Rechazadas'];
+
+    return Column(
+      children: [
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 8),
+          child: Row(
+            children: filters.map((name) {
+              final selected = _filter == name;
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: ChoiceChip(
+                  label: Text(name),
+                  selected: selected,
+                  showCheckmark: false,
+                  selectedColor: const Color(0xFFE3F2FD),
+                  labelStyle: TextStyle(
+                    color: selected ? DenuPeColors.primary : DenuPeColors.text,
+                    fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                  ),
+                  side: BorderSide(
+                    color: selected ? DenuPeColors.primary : DenuPeColors.border,
+                  ),
+                  onSelected: (_) => setState(() => _filter = name),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        Expanded(
+          child: _loading
+              ? const Center(child: CircularProgressIndicator())
+              : _error != null
+                  ? _StatusMessage(
+                      icon: Icons.cloud_off,
+                      title: 'No se pudieron cargar las denuncias',
+                      detail: _error!,
+                      retryLabel: 'Reintentar',
+                      onRetry: _load,
+                    )
+                  : _complaints.isEmpty
+                      ? const _StatusMessage(
+                          icon: Icons.inbox_outlined,
+                          title: 'Aún no tienes denuncias',
+                          detail: 'Toca "Nueva" para reportar un problema en tu ciudad.',
+                        )
+                      : RefreshIndicator(
+                          onRefresh: _load,
+                          child: filtered.isEmpty
+                              ? ListView(
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  children: [
+                                    const SizedBox(height: 90),
+                                    _StatusMessage(
+                                      icon: Icons.filter_alt_off_outlined,
+                                      title: 'Sin denuncias en este estado',
+                                      detail: 'No tienes denuncias que coincidan con el filtro "$_filter".',
+                                    ),
+                                  ],
+                                )
+                              : ListView.separated(
+                                  physics: const AlwaysScrollableScrollPhysics(),
+                                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 16),
+                                  itemCount: filtered.length,
+                                  separatorBuilder: (_, _) => const SizedBox(height: 10),
+                                  itemBuilder: (context, index) {
+                                    final item = filtered[index];
+                                    return _ComplaintCard(
+                                      complaint: item,
+                                      categoryName: categoryNameOf(_cats, item.categoryId),
+                                      authorityName: authorityNameOf(_autoridades, item.autoridadId),
+                                      onTap: () => _openDetail(item),
+                                    );
+                                  },
+                                ),
+                        ),
+        ),
+      ],
     );
   }
 }
@@ -145,84 +207,69 @@ class _ComplaintCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final date = complaint.createdAt;
-    final dateText = '${date.day}/${date.month}/${date.year}';
+    final dateText = '${date.day} ${_monthName(date.month)} ${date.year}';
     return Card(
+      margin: EdgeInsets.zero,
+      color: DenuPeColors.surface,
+      elevation: 0,
       clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: DenuPeColors.border),
+      ),
       child: InkWell(
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
+          padding: const EdgeInsets.all(10),
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
+              _ComplaintThumbnail(complaintId: complaint.id),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
                       complaint.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: DenuPeColors.text,
                       ),
                     ),
-                  ),
-                  _StatusChip(status: complaint.status),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                categoryName,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  Icon(Icons.account_balance_outlined,
-                      size: 14, color: Colors.grey.shade600),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      authorityName,
+                    const SizedBox(height: 5),
+                    Text(
+                      'Código: #${complaint.id.length > 8 ? complaint.id.substring(0, 8) : complaint.id}',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: const TextStyle(fontSize: 11, color: Color(0xFF64748B)),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                complaint.description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium,
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(Icons.calendar_today,
-                      size: 14, color: Colors.grey.shade600),
-                  const SizedBox(width: 4),
-                  Text(
-                    dateText,
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  if (complaint.address != null &&
-                      complaint.address!.isNotEmpty) ...[
-                    const SizedBox(width: 12),
-                    Icon(Icons.place_outlined,
-                        size: 14, color: Colors.grey.shade600),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        complaint.address!,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Icon(Icons.calendar_today_outlined,
+                            size: 12, color: Color(0xFF64748B)),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(dateText,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 11, color: Color(0xFF64748B))),
+                        ),
+                        const SizedBox(width: 4),
+                        _StatusChip(status: complaint.status),
+                      ],
                     ),
                   ],
-                ],
+                ),
+              ),
+              const SizedBox(width: 3),
+              const Padding(
+                padding: EdgeInsets.only(top: 25),
+                child: Icon(Icons.chevron_right, size: 19, color: Color(0xFF64748B)),
               ),
             ],
           ),
@@ -230,6 +277,82 @@ class _ComplaintCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _monthName(int month) {
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun',
+    'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  return months[month - 1];
+}
+
+/// Obtiene la primera evidencia real, si existe, del almacenamiento privado.
+class _ComplaintThumbnail extends StatefulWidget {
+  const _ComplaintThumbnail({required this.complaintId});
+  final String complaintId;
+
+  @override
+  State<_ComplaintThumbnail> createState() => _ComplaintThumbnailState();
+}
+
+class _ComplaintThumbnailState extends State<_ComplaintThumbnail> {
+  late Future<String?> _imageUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _imageUrl = _loadImage();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ComplaintThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.complaintId != widget.complaintId) {
+      _imageUrl = _loadImage();
+    }
+  }
+
+  Future<String?> _loadImage() async {
+    try {
+      final media = await api.complaintMedia(widget.complaintId);
+      for (final item in media) {
+        if (item.isImage) {
+          return await api.complaintMediaSignedUrl(item.storageKey);
+        }
+      }
+    } catch (_) {
+      // La falta de una miniatura no debe impedir ver la denuncia.
+    }
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: 76,
+        height: 80,
+        child: FutureBuilder<String?>(
+          future: _imageUrl,
+          builder: (context, snapshot) {
+            final url = snapshot.data;
+            if (url == null) return _placeholder();
+            return Image.network(
+              url,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) => _placeholder(),
+            );
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _placeholder() => Container(
+    color: const Color(0xFFE3F2FD),
+    child: const Icon(Icons.image_outlined,
+        color: DenuPeColors.primary, size: 30),
+  );
 }
 
 class _StatusChip extends StatelessWidget {
@@ -240,16 +363,23 @@ class _StatusChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _statusColor(status);
+    final isInProgress = status == 'en_proceso';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
+        color: isInProgress
+            ? DenuPeColors.warning
+            : color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
+
       ),
       child: Text(
         statusLabel(status),
-        style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          color: isInProgress ? DenuPeColors.text : color,
+          fontSize: 10,
+          fontWeight: FontWeight.w600,
+        ),
       ),
     );
   }
@@ -258,17 +388,17 @@ class _StatusChip extends StatelessWidget {
 Color _statusColor(String status) {
   switch (status) {
     case 'en_revision':
-      return const Color(0xFF1565C0);
+      return DenuPeColors.primary;
     case 'en_proceso':
-      return const Color(0xFFEF6C00);
+      return DenuPeColors.warningText;
     case 'resuelta':
-      return const Color(0xFF2E7D32);
+      return DenuPeColors.success;
     case 'rechazada':
-      return const Color(0xFFC62828);
+      return DenuPeColors.error;
     case 'archivada':
       return Colors.grey;
     default: // recibida
-      return Colors.blueGrey;
+      return DenuPeColors.primary;
   }
 }
 
@@ -291,21 +421,23 @@ class _StatusMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
+        padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 340),
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon, size: 56, color: Colors.grey.shade400),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             Text(title,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                     fontSize: 16, fontWeight: FontWeight.w600)),
             if (detail != null) ...[
-              const SizedBox(height: 6),
+              const SizedBox(height: 10),
               Text(detail!,
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey.shade600, fontSize: 13)),
+                  style: TextStyle(color: Colors.grey.shade600, fontSize: 14, height: 1.45)),
             ],
             if (retryLabel != null && onRetry != null) ...[
               const SizedBox(height: 16),
@@ -315,6 +447,7 @@ class _StatusMessage extends StatelessWidget {
               ),
             ],
           ],
+          ),
         ),
       ),
     );
