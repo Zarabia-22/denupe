@@ -412,6 +412,23 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                 onChanged: (v) { _setStep(0); setState(() => _categoryId = v); },
                 validator: (v) => v == null ? 'Selecciona una categoría' : null,
               ),
+              const SizedBox(height: 12),
+              // HU-IA01 / UI-08: diseño inicial del acceso a la recomendación.
+              // La integración con el servicio de IA se implementará después.
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => _showMessage(
+                    'La recomendación con IA estará disponible próximamente.',
+                  ),
+                  icon: const Icon(Icons.auto_awesome_outlined),
+                  label: const Text('Sugerir categoría con IA'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    alignment: Alignment.center,
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
               const Text('Ubicación', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
