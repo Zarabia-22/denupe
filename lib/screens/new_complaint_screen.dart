@@ -37,6 +37,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
     if (_activeStep != step && mounted) setState(() => _activeStep = step);
   }
   String? _categoryId;
+  String? _suggestedCategoryId;
   String? _error;
   bool _loading = false;
   double? _latitude;
@@ -220,6 +221,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
     setState(() {
       _latitude = null;
       _longitude = null;
+      _suggestedCategoryId = null;
     });
     _showMessage('Denuncia enviada. ¡Gracias por reportar!');
     widget.onCreated?.call();
@@ -231,6 +233,25 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
       barrierDismissible: false,
       builder: (_) => const _AiSuggestionLoadingDialog(),
     );
+    if (!mounted) return;
+    // Simulación de diseño: se muestra una categoría de la lista disponible.
+    // La recomendación real se conectará al servicio de IA posteriormente.
+    setState(() {
+      _suggestedCategoryId = _cats.isEmpty ? null : _cats.first.id;
+    });
+    if (_cats.isEmpty) {
+      _showMessage('No hay categorías disponibles para sugerir.');
+    }
+  }
+
+  void _acceptAiSuggestion() {
+    final suggestion = _suggestedCategoryId;
+    if (suggestion == null) return;
+    setState(() {
+      _categoryId = suggestion;
+      _suggestedCategoryId = null;
+    });
+    _showMessage('Categoría sugerida seleccionada');
   }
 
   void _showMessage(String message) {
@@ -417,12 +438,12 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                         ))
                     .toList(),
                 onTap: () => _setStep(0),
-                onChanged: (v) { _setStep(0); setState(() => _categoryId = v); },
+                onChanged: (v) { _setStep(0); setState(() { _categoryId = v; _suggestedCategoryId = null; }); },
                 validator: (v) => v == null ? 'Selecciona una categoría' : null,
               ),
               const SizedBox(height: 12),
-              // HU-IA01 / UI-08: carga visual de 3 segundos.
-              // Aún no se realiza una solicitud a un servicio de IA.
+              // HU-IA01 / UI-08: carga visual y sugerencia simulada.
+              // La categoría no cambia hasta que el usuario la acepte.
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
@@ -435,6 +456,72 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                   ),
                 ),
               ),
+              if (_suggestedCategoryId != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: DenuPeColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: DenuPeColors.primary.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.auto_awesome_outlined,
+                              color: DenuPeColors.primary),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Categoría sugerida por IA',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _cats
+                            .where((c) => c.id == _suggestedCategoryId)
+                            .map((c) => c.name)
+                            .firstOrNull ?? 'Categoría no disponible',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Esta es una sugerencia. Tú decides si usarla.',
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: _acceptAiSuggestion,
+                            icon: const Icon(Icons.check),
+                            label: const Text('Usar sugerencia'),
+                          ),
+                          OutlinedButton(
+                            onPressed: _showAiLoadingDialog,
+                            child: const Text('Volver a sugerir'),
+                          ),
+                          TextButton(
+                            onPressed: () => setState(
+                              () => _suggestedCategoryId = null,
+                            ),
+                            child: const Text('Ignorar'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               const Text('Ubicación', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
