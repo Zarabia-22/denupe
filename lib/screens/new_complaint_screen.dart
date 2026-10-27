@@ -225,6 +225,14 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
     widget.onCreated?.call();
   }
 
+  Future<void> _showAiLoadingDialog() async {
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _AiSuggestionLoadingDialog(),
+    );
+  }
+
   void _showMessage(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context)
@@ -413,14 +421,12 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                 validator: (v) => v == null ? 'Selecciona una categoría' : null,
               ),
               const SizedBox(height: 12),
-              // HU-IA01 / UI-08: diseño inicial del acceso a la recomendación.
-              // La integración con el servicio de IA se implementará después.
+              // HU-IA01 / UI-08: carga visual de 3 segundos.
+              // Aún no se realiza una solicitud a un servicio de IA.
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: () => _showMessage(
-                    'La recomendación con IA estará disponible próximamente.',
-                  ),
+                  onPressed: _showAiLoadingDialog,
                   icon: const Icon(Icons.auto_awesome_outlined),
                   label: const Text('Sugerir categoría con IA'),
                   style: OutlinedButton.styleFrom(
@@ -506,6 +512,51 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Ventana de carga visual de la futura recomendación de categoría con IA.
+class _AiSuggestionLoadingDialog extends StatefulWidget {
+  const _AiSuggestionLoadingDialog();
+
+  @override
+  State<_AiSuggestionLoadingDialog> createState() =>
+      _AiSuggestionLoadingDialogState();
+}
+
+class _AiSuggestionLoadingDialogState
+    extends State<_AiSuggestionLoadingDialog> {
+  @override
+  void initState() {
+    super.initState();
+    Future<void>.delayed(const Duration(seconds: 3), () {
+      if (mounted) Navigator.of(context).pop();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: AlertDialog(
+        title: const Text('Sugerencia con IA'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text('Procesando información'),
+            const SizedBox(height: 16),
+            TweenAnimationBuilder<double>(
+              tween: Tween<double>(begin: 0, end: 1),
+              duration: const Duration(seconds: 3),
+              builder: (context, progress, _) {
+                return LinearProgressIndicator(value: progress);
+              },
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
