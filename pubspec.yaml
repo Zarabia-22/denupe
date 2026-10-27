@@ -67,6 +67,10 @@ flutter:
 
   assets:
     - .env
+    - assets/
+    - assets/images/
+    - assets/denupe_logo.png
+    - assets/images/denupe_logo.png
 
   # To add assets to your application, add an assets section, like this:
   # assets:
