@@ -67,10 +67,17 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   child: Stack(children: [
                     const Align(alignment: Alignment.bottomRight, child: Icon(Icons.location_city_rounded, size: 170, color: Color(0x554CA5ED))),
-                    const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('DenuPe', style: TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: Colors.white)),
-                      SizedBox(height: 10),
-                      Text('Tu voz construye\nuna ciudad mejor', style: TextStyle(fontSize: 18, height: 1.35, color: Colors.white)),
+                    Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Image.asset(
+                        'assets/denupe_logo.png',
+                        height: 72,
+                        fit: BoxFit.contain,
+                        errorBuilder: (context, error, stackTrace) => const Icon(Icons.account_balance, size: 48, color: Colors.white),
+                      ),
+                      const SizedBox(height: 10),
+                      const Text('DenuPe', style: TextStyle(fontSize: 34, fontWeight: FontWeight.bold, color: Colors.white)),
+                      const SizedBox(height: 6),
+                      const Text('Tu voz construye\nuna ciudad mejor', style: TextStyle(fontSize: 18, height: 1.35, color: Colors.white)),
                     ]),
                   ]),
                 ),

@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../models.dart';
 import '../services/app_scope.dart';
+import '../services/ai_category_service.dart';
 import 'complaint_confirmation_screen.dart';
 import 'profile_edit_screen.dart';
 
@@ -37,6 +38,8 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
     if (_activeStep != step && mounted) setState(() => _activeStep = step);
   }
   String? _categoryId;
+  String? _suggestedCategoryId;
+  bool _suggestingAi = false;
   String? _error;
   bool _loading = false;
   double? _latitude;
@@ -49,6 +52,8 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
   void initState() {
     super.initState();
     _loadCategories();
+    _title.addListener(_invalidateSuggestion);
+    _description.addListener(_invalidateSuggestion);
     _titleFocus.addListener(() { if (_titleFocus.hasFocus) _setStep(0); });
     _descriptionFocus.addListener(() { if (_descriptionFocus.hasFocus) _setStep(0); });
     _addressFocus.addListener(() { if (_addressFocus.hasFocus) _setStep(1); });
@@ -56,6 +61,8 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
 
   @override
   void dispose() {
+    _title.removeListener(_invalidateSuggestion);
+    _description.removeListener(_invalidateSuggestion);
     _title.dispose();
     _description.dispose();
     _address.dispose();
@@ -220,9 +227,122 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
     setState(() {
       _latitude = null;
       _longitude = null;
+      _suggestedCategoryId = null;
     });
     _showMessage('Denuncia enviada. ¡Gracias por reportar!');
     widget.onCreated?.call();
+  }
+
+  void _invalidateSuggestion() {
+    // Una predicción anterior ya no corresponde al texto editado.
+    if (_suggestedCategoryId != null && mounted) {
+      setState(() => _suggestedCategoryId = null);
+    }
+  }
+
+  static String _normalizeCategory(String value) {
+    return value.toLowerCase().trim()
+        .replaceAll(RegExp(r'[áàäâ]'), 'a')
+        .replaceAll(RegExp(r'[éèëê]'), 'e')
+        .replaceAll(RegExp(r'[íìïî]'), 'i')
+        .replaceAll(RegExp(r'[óòöô]'), 'o')
+        .replaceAll(RegExp(r'[úùüû]'), 'u')
+        .replaceAll('ñ', 'n')
+        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ');
+  }
+
+  Category? _matchingCategory(String label) {
+    final prediction = _normalizeCategory(label);
+    final aliases = <String, List<String>>{
+      'alumbrado': ['alumbrado', 'iluminacion publica'],
+      'limpieza': ['limpieza', 'residuos solidos', 'basura'],
+      'seguridad': ['seguridad', 'serenazgo', 'delincuencia'],
+      'ruido': ['ruido', 'contaminacion sonora'],
+    };
+    final keywords = aliases[prediction] ?? <String>[prediction];
+    final matches = _cats.where((c) {
+      final name = _normalizeCategory(c.name);
+      final code = _normalizeCategory(c.code);
+      return name == prediction || code == prediction ||
+          keywords.any((keyword) =>
+              name == keyword || code == keyword ||
+              name.contains(keyword) || code.contains(keyword));
+    }).toList();
+
+    // Si hay dos categorías parecidas, no elegimos una arbitrariamente.
+    return matches.length == 1 ? matches.single : null;
+  }
+
+  Future<void> _showAiLoadingDialog() async {
+    if (_suggestingAi) return;
+    final title = _title.text.trim();
+    final description = _description.text.trim();
+    if (title.length < 5 || description.length < 10) {
+      _showMessage('Completa el título y la descripción antes de solicitar una sugerencia.');
+      return;
+    }
+    if (_cats.isEmpty) {
+      _showMessage('No hay categorías disponibles para sugerir.');
+      return;
+    }
+    setState(() {
+      _suggestingAi = true;
+      _suggestedCategoryId = null;
+    });
+
+    // Conserva la interfaz de carga ya diseñada, sin espera simulada.
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _AiSuggestionLoadingDialog(),
+    );
+
+    AiCategorySuggestion? result;
+    String? error;
+    try {
+      result = await AiCategoryService().sugerirCategoria(
+        titulo: title,
+        descripcion: description,
+      );
+    } on AiCategoryException catch (e) {
+      error = e.message;
+    } catch (_) {
+      error = 'No se pudo obtener la sugerencia. Puedes elegir la categoría manualmente.';
+    } finally {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        setState(() => _suggestingAi = false);
+      }
+    }
+    if (!mounted) return;
+    if (error != null) {
+      _showMessage(error);
+      return;
+    }
+    if (title != _title.text.trim() || description != _description.text.trim()) {
+      _showMessage('El texto cambió durante el análisis. Solicita una nueva sugerencia.');
+      return;
+    }
+    if (result?.sugerida != true || result?.categoria == null) {
+      _showMessage(result?.motivo ?? 'La IA no encontró una categoría. Elige una manualmente.');
+      return;
+    }
+    final category = _matchingCategory(result!.categoria!);
+    if (category == null) {
+      _showMessage('La categoría sugerida no coincide con una única categoría disponible. Selecciónala manualmente.');
+      return;
+    }
+    setState(() => _suggestedCategoryId = category.id);
+  }
+
+  void _acceptAiSuggestion() {
+    final suggestion = _suggestedCategoryId;
+    if (suggestion == null) return;
+    setState(() {
+      _categoryId = suggestion;
+      _suggestedCategoryId = null;
+    });
+    _showMessage('Categoría sugerida seleccionada');
   }
 
   void _showMessage(String message) {
@@ -397,6 +517,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
+                key: ValueKey(_categoryId),
                 initialValue: _categoryId,
                 decoration: const InputDecoration(
                   labelText: 'Categoría *',
@@ -409,9 +530,90 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                         ))
                     .toList(),
                 onTap: () => _setStep(0),
-                onChanged: (v) { _setStep(0); setState(() => _categoryId = v); },
+                onChanged: (v) { _setStep(0); setState(() { _categoryId = v; _suggestedCategoryId = null; }); },
                 validator: (v) => v == null ? 'Selecciona una categoría' : null,
               ),
+              const SizedBox(height: 12),
+              // HU-IA01: sugerencia real mediante el servicio Python + FastAPI.
+              // La categoría no cambia hasta que el usuario la acepte.
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _suggestingAi ? null : _showAiLoadingDialog,
+                  icon: const Icon(Icons.auto_awesome_outlined),
+                  label: const Text('Sugerir categoría con IA'),
+                  style: OutlinedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    alignment: Alignment.center,
+                  ),
+                ),
+              ),
+              if (_suggestedCategoryId != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: DenuPeColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: DenuPeColors.primary.withValues(alpha: 0.35),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.auto_awesome_outlined,
+                              color: DenuPeColors.primary),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Categoría sugerida por IA',
+                              style: TextStyle(fontWeight: FontWeight.w600),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _cats
+                            .where((c) => c.id == _suggestedCategoryId)
+                            .map((c) => c.name)
+                            .firstOrNull ?? 'Categoría no disponible',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 6),
+                      const Text(
+                        'Esta es una sugerencia. Tú decides si usarla.',
+                      ),
+                      const SizedBox(height: 12),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          FilledButton.icon(
+                            onPressed: _acceptAiSuggestion,
+                            icon: const Icon(Icons.check),
+                            label: const Text('Usar sugerencia'),
+                          ),
+                          OutlinedButton(
+                            onPressed: _showAiLoadingDialog,
+                            child: const Text('Volver a sugerir'),
+                          ),
+                          TextButton(
+                            onPressed: () => setState(
+                              () => _suggestedCategoryId = null,
+                            ),
+                            child: const Text('Ignorar'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
               const SizedBox(height: 16),
               const Text('Ubicación', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
@@ -449,16 +651,20 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
               if (_media.isNotEmpty) ..._buildMediaRow(),
               Row(
                 children: [
-                  OutlinedButton.icon(
-                    onPressed: _pickImage,
-                    icon: const Icon(Icons.photo_camera_outlined),
-                    label: const Text('Foto'),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickImage,
+                      icon: const Icon(Icons.photo_camera_outlined),
+                      label: const Text('Foto'),
+                    ),
                   ),
                   const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: _pickVideo,
-                    icon: const Icon(Icons.videocam_outlined),
-                    label: const Text('Video'),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickVideo,
+                      icon: const Icon(Icons.videocam_outlined),
+                      label: const Text('Video'),
+                    ),
                   ),
                 ],
               ),
@@ -489,6 +695,30 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
           ),
         ),
       ],
+    );
+  }
+}
+
+/// Diálogo de carga real; se cierra cuando termina la solicitud HTTP.
+class _AiSuggestionLoadingDialog extends StatelessWidget {
+  const _AiSuggestionLoadingDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return const PopScope(
+      canPop: false,
+      child: AlertDialog(
+        title: Text('Sugerencia con IA'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Analizando título y descripción'),
+            SizedBox(height: 16),
+            LinearProgressIndicator(),
+          ],
+        ),
+      ),
     );
   }
 }
