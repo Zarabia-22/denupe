@@ -559,16 +559,20 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
               if (_media.isNotEmpty) ..._buildMediaRow(),
               Row(
                 children: [
-                  OutlinedButton.icon(
-                    onPressed: _pickImage,
-                    icon: const Icon(Icons.photo_camera_outlined),
-                    label: const Text('Foto'),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickImage,
+                      icon: const Icon(Icons.photo_camera_outlined),
+                      label: const Text('Foto'),
+                    ),
                   ),
                   const SizedBox(width: 8),
-                  OutlinedButton.icon(
-                    onPressed: _pickVideo,
-                    icon: const Icon(Icons.videocam_outlined),
-                    label: const Text('Video'),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickVideo,
+                      icon: const Icon(Icons.videocam_outlined),
+                      label: const Text('Video'),
+                    ),
                   ),
                 ],
               ),
