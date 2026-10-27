@@ -7,6 +7,7 @@ import 'package:image_picker/image_picker.dart';
 
 import '../models.dart';
 import '../services/app_scope.dart';
+import '../services/ai_category_service.dart';
 import 'complaint_confirmation_screen.dart';
 import 'profile_edit_screen.dart';
 
@@ -38,6 +39,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
   }
   String? _categoryId;
   String? _suggestedCategoryId;
+  bool _suggestingAi = false;
   String? _error;
   bool _loading = false;
   double? _latitude;
@@ -50,6 +52,8 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
   void initState() {
     super.initState();
     _loadCategories();
+    _title.addListener(_invalidateSuggestion);
+    _description.addListener(_invalidateSuggestion);
     _titleFocus.addListener(() { if (_titleFocus.hasFocus) _setStep(0); });
     _descriptionFocus.addListener(() { if (_descriptionFocus.hasFocus) _setStep(0); });
     _addressFocus.addListener(() { if (_addressFocus.hasFocus) _setStep(1); });
@@ -57,6 +61,8 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
 
   @override
   void dispose() {
+    _title.removeListener(_invalidateSuggestion);
+    _description.removeListener(_invalidateSuggestion);
     _title.dispose();
     _description.dispose();
     _address.dispose();
@@ -227,21 +233,106 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
     widget.onCreated?.call();
   }
 
+  void _invalidateSuggestion() {
+    // Una predicción anterior ya no corresponde al texto editado.
+    if (_suggestedCategoryId != null && mounted) {
+      setState(() => _suggestedCategoryId = null);
+    }
+  }
+
+  static String _normalizeCategory(String value) {
+    return value.toLowerCase().trim()
+        .replaceAll(RegExp(r'[áàäâ]'), 'a')
+        .replaceAll(RegExp(r'[éèëê]'), 'e')
+        .replaceAll(RegExp(r'[íìïî]'), 'i')
+        .replaceAll(RegExp(r'[óòöô]'), 'o')
+        .replaceAll(RegExp(r'[úùüû]'), 'u')
+        .replaceAll('ñ', 'n')
+        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ');
+  }
+
+  Category? _matchingCategory(String label) {
+    final prediction = _normalizeCategory(label);
+    final aliases = <String, List<String>>{
+      'alumbrado': ['alumbrado', 'iluminacion publica'],
+      'limpieza': ['limpieza', 'residuos solidos', 'basura'],
+      'seguridad': ['seguridad', 'serenazgo', 'delincuencia'],
+      'ruido': ['ruido', 'contaminacion sonora'],
+    };
+    final keywords = aliases[prediction] ?? <String>[prediction];
+    final matches = _cats.where((c) {
+      final name = _normalizeCategory(c.name);
+      final code = _normalizeCategory(c.code);
+      return name == prediction || code == prediction ||
+          keywords.any((keyword) =>
+              name == keyword || code == keyword ||
+              name.contains(keyword) || code.contains(keyword));
+    }).toList();
+
+    // Si hay dos categorías parecidas, no elegimos una arbitrariamente.
+    return matches.length == 1 ? matches.single : null;
+  }
+
   Future<void> _showAiLoadingDialog() async {
-    await showDialog<void>(
+    if (_suggestingAi) return;
+    final title = _title.text.trim();
+    final description = _description.text.trim();
+    if (title.length < 5 || description.length < 10) {
+      _showMessage('Completa el título y la descripción antes de solicitar una sugerencia.');
+      return;
+    }
+    if (_cats.isEmpty) {
+      _showMessage('No hay categorías disponibles para sugerir.');
+      return;
+    }
+    setState(() {
+      _suggestingAi = true;
+      _suggestedCategoryId = null;
+    });
+
+    // Conserva la interfaz de carga ya diseñada, sin espera simulada.
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => const _AiSuggestionLoadingDialog(),
     );
-    if (!mounted) return;
-    // Simulación de diseño: se muestra una categoría de la lista disponible.
-    // La recomendación real se conectará al servicio de IA posteriormente.
-    setState(() {
-      _suggestedCategoryId = _cats.isEmpty ? null : _cats.first.id;
-    });
-    if (_cats.isEmpty) {
-      _showMessage('No hay categorías disponibles para sugerir.');
+
+    AiCategorySuggestion? result;
+    String? error;
+    try {
+      result = await AiCategoryService().sugerirCategoria(
+        titulo: title,
+        descripcion: description,
+      );
+    } on AiCategoryException catch (e) {
+      error = e.message;
+    } catch (_) {
+      error = 'No se pudo obtener la sugerencia. Puedes elegir la categoría manualmente.';
+    } finally {
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        setState(() => _suggestingAi = false);
+      }
     }
+    if (!mounted) return;
+    if (error != null) {
+      _showMessage(error);
+      return;
+    }
+    if (title != _title.text.trim() || description != _description.text.trim()) {
+      _showMessage('El texto cambió durante el análisis. Solicita una nueva sugerencia.');
+      return;
+    }
+    if (result?.sugerida != true || result?.categoria == null) {
+      _showMessage(result?.motivo ?? 'La IA no encontró una categoría. Elige una manualmente.');
+      return;
+    }
+    final category = _matchingCategory(result!.categoria!);
+    if (category == null) {
+      _showMessage('La categoría sugerida no coincide con una única categoría disponible. Selecciónala manualmente.');
+      return;
+    }
+    setState(() => _suggestedCategoryId = category.id);
   }
 
   void _acceptAiSuggestion() {
@@ -426,6 +517,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
+                key: ValueKey(_categoryId),
                 initialValue: _categoryId,
                 decoration: const InputDecoration(
                   labelText: 'Categoría *',
@@ -442,12 +534,12 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                 validator: (v) => v == null ? 'Selecciona una categoría' : null,
               ),
               const SizedBox(height: 12),
-              // HU-IA01 / UI-08: carga visual y sugerencia simulada.
+              // HU-IA01: sugerencia real mediante el servicio Python + FastAPI.
               // La categoría no cambia hasta que el usuario la acepte.
               SizedBox(
                 width: double.infinity,
                 child: OutlinedButton.icon(
-                  onPressed: _showAiLoadingDialog,
+                  onPressed: _suggestingAi ? null : _showAiLoadingDialog,
                   icon: const Icon(Icons.auto_awesome_outlined),
                   label: const Text('Sugerir categoría con IA'),
                   style: OutlinedButton.styleFrom(
@@ -607,44 +699,23 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
   }
 }
 
-/// Ventana de carga visual de la futura recomendación de categoría con IA.
-class _AiSuggestionLoadingDialog extends StatefulWidget {
+/// Diálogo de carga real; se cierra cuando termina la solicitud HTTP.
+class _AiSuggestionLoadingDialog extends StatelessWidget {
   const _AiSuggestionLoadingDialog();
 
   @override
-  State<_AiSuggestionLoadingDialog> createState() =>
-      _AiSuggestionLoadingDialogState();
-}
-
-class _AiSuggestionLoadingDialogState
-    extends State<_AiSuggestionLoadingDialog> {
-  @override
-  void initState() {
-    super.initState();
-    Future<void>.delayed(const Duration(seconds: 3), () {
-      if (mounted) Navigator.of(context).pop();
-    });
-  }
-
-  @override
   Widget build(BuildContext context) {
-    return PopScope(
+    return const PopScope(
       canPop: false,
       child: AlertDialog(
-        title: const Text('Sugerencia con IA'),
+        title: Text('Sugerencia con IA'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Procesando información'),
-            const SizedBox(height: 16),
-            TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0, end: 1),
-              duration: const Duration(seconds: 3),
-              builder: (context, progress, _) {
-                return LinearProgressIndicator(value: progress);
-              },
-            ),
+            Text('Analizando título y descripción'),
+            SizedBox(height: 16),
+            LinearProgressIndicator(),
           ],
         ),
       ),
