@@ -22,6 +22,9 @@ abstract final class Config {
   /// URL pública HTTPS de la API FastAPI; nulo si no se ha configurado.
   static String? get aiBaseUrl {
     final value = dotenv.env['DENUPE_IA_URL']?.trim();
-    return (value == null || value.isEmpty) ? null : value;
+    // Servicio público de IA; .env permite usar un entorno alternativo.
+    return (value == null || value.isEmpty)
+        ? 'https://denupe-ia-backend.onrender.com'
+        : value;
   }
 }
