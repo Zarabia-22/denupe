@@ -159,9 +159,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 16),
           TextFormField(
             controller: _password,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Contraseña', hintText: 'Mínimo 8 caracteres', suffixIcon: IconButton(icon: Icon(_showPassword ? Icons.visibility_off_outlined : Icons.visibility_outlined), onPressed: () => setState(() => _showPassword = !_showPassword)),
-              prefixIcon: Icon(Icons.lock_outline),
+              prefixIcon: const Icon(Icons.lock_outline),
             ),
             obscureText: !_showPassword,
             validator: (v) => (v == null || v.length < 8)
@@ -171,9 +171,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
           const SizedBox(height: 16),
           TextFormField(
             controller: _confirm,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Confirmar contraseña', hintText: 'Repite tu contraseña', suffixIcon: IconButton(icon: Icon(_showConfirm ? Icons.visibility_off_outlined : Icons.visibility_outlined), onPressed: () => setState(() => _showConfirm = !_showConfirm)),
-              prefixIcon: Icon(Icons.lock_outline),
+              prefixIcon: const Icon(Icons.lock_outline),
             ),
             obscureText: !_showConfirm,
             validator: (v) =>

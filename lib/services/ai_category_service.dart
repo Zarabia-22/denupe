@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
+
+import 'package:http/http.dart' as http;
 
 import '../config.dart';
 
@@ -25,7 +26,7 @@ class AiCategorySuggestion {
   }
 }
 
-/// Cliente HTTP móvil (Android / iOS) para el microservicio FastAPI de DenuPe.
+/// Cliente HTTP para el microservicio FastAPI de DenuPe (compatible web/móvil).
 class AiCategoryService {
   Future<AiCategorySuggestion> sugerirCategoria({
     required String titulo,
@@ -45,30 +46,24 @@ class AiCategoryService {
       throw const AiCategoryException('La URL del servicio de IA no es válida.');
     }
 
-    final client = HttpClient()
-      ..connectionTimeout = const Duration(seconds: 8);
     try {
-      final request = await client.postUrl(uri).timeout(
-        const Duration(seconds: 10),
-      );
-      request.headers.contentType = ContentType.json;
-      request.add(utf8.encode(jsonEncode({
-        'titulo': titulo.trim(),
-        'descripcion': descripcion.trim(),
-      })));
-      final response = await request.close().timeout(
-        const Duration(seconds: 15),
-      );
-      final responseBody = await utf8.decoder.bind(response).join().timeout(
-        const Duration(seconds: 15),
-      );
+      final response = await http
+          .post(
+            uri,
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'titulo': titulo.trim(),
+              'descripcion': descripcion.trim(),
+            }),
+          )
+          .timeout(const Duration(seconds: 15));
 
-      if (response.statusCode != HttpStatus.ok) {
+      if (response.statusCode != 200) {
         throw const AiCategoryException(
           'El servicio de IA no pudo procesar la denuncia. Elige una categoría manualmente.',
         );
       }
-      final decoded = jsonDecode(responseBody);
+      final decoded = jsonDecode(response.body);
       if (decoded is! Map<String, dynamic>) {
         throw const FormatException('Respuesta inválida del servicio');
       }
@@ -77,18 +72,12 @@ class AiCategoryService {
       throw const AiCategoryException(
         'La sugerencia está tardando demasiado. Puedes elegir una categoría manualmente.',
       );
-    } on SocketException {
-      throw const AiCategoryException(
-        'No hay conexión con el servicio de IA. Puedes elegir una categoría manualmente.',
-      );
     } on AiCategoryException {
       rethrow;
-    } catch (_) {
-      throw const AiCategoryException(
-        'No se pudo obtener la sugerencia. Puedes elegir una categoría manualmente.',
+    } catch (e) {
+      throw AiCategoryException(
+        'No se pudo obtener la sugerencia. Puedes elegir una categoría manualmente. ($e)',
       );
-    } finally {
-      client.close(force: true);
     }
   }
 }
