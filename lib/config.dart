@@ -18,4 +18,10 @@ abstract final class Config {
     }
     return value;
   }
+
+  /// URL pública HTTPS de la API FastAPI; nulo si no se ha configurado.
+  static String? get aiBaseUrl {
+    final value = dotenv.env['DENUPE_IA_URL']?.trim();
+    return (value == null || value.isEmpty) ? null : value;
+  }
 }
