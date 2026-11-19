@@ -69,6 +69,51 @@ class AiEntitySuggestion {
 
 /// Cliente del endpoint HU-IA02 del backend FastAPI.
 class AiEntityService {
+
+  /// Obtiene instituciones elegibles para que el ciudadano las seleccione manualmente.
+  Future<List<AiPublicEntity>> listarEntidadesDisponibles({
+    required String categoria,
+    required String departamento,
+    required String provincia,
+    required String distrito,
+    double? latitud,
+    double? longitud,
+  }) async {
+    final baseUrl = Config.aiBaseUrl;
+    if (baseUrl == null || baseUrl.trim().isEmpty) {
+      throw const AiEntityException('Configura DENUPE_IA_URL para consultar el catálogo de instituciones.');
+    }
+    final base = Uri.parse('${baseUrl.replaceAll(RegExp(r"/+$"), "")}/api/entidades/disponibles');
+    final uri = base.replace(queryParameters: {
+      'categoria': categoria,
+      'departamento': departamento,
+      'provincia': provincia,
+      'distrito': distrito,
+      if (latitud != null) 'latitud': latitud.toString(),
+      if (longitud != null) 'longitud': longitud.toString(),
+    });
+    try {
+      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      if (response.statusCode != 200) {
+        throw const AiEntityException('No se pudo cargar el catálogo de instituciones.');
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic> || decoded['entidades'] is! List) {
+        throw const FormatException('Respuesta inválida del catálogo');
+      }
+      return (decoded['entidades'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map(AiPublicEntity.fromJson)
+          .toList();
+    } on TimeoutException {
+      throw const AiEntityException('El catálogo está tardando demasiado en responder.');
+    } on AiEntityException {
+      rethrow;
+    } catch (_) {
+      throw const AiEntityException('No se pudo conectar con el catálogo de instituciones.');
+    }
+  }
+
   Future<AiEntitySuggestion> sugerirEntidad({
     required String categoria,
     required String departamento,
