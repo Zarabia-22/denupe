@@ -40,9 +40,7 @@ class ComplaintConfirmationScreen extends StatefulWidget {
 class _ComplaintConfirmationScreenState
     extends State<ComplaintConfirmationScreen> {
   List<Authority> _autoridades = [];
-  bool _loading = true;
-  String? _error;
-  String? _tipo = 'municipalidad';
+  String? _selectedAuthorityId;
   bool _confirming = false;
   bool _suggestingEntity = false;
   AiEntitySuggestion? _entitySuggestion;
@@ -54,31 +52,39 @@ class _ComplaintConfirmationScreenState
   }
 
   Future<void> _loadAutoridades() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    // El catálogo local solo se consulta para traducir tipos de entidad
+    // compatibles. Un fallo aquí no impide registrar la denuncia: la BD
+    // conserva su asignación predeterminada por categoría.
     try {
       final list = await authorities();
       if (!mounted) return;
-      setState(() {
-        _autoridades = list;
-        _loading = false;
-      });
-    } catch (e) {
+      setState(() => _autoridades = list);
+    } catch (_) {
       if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = e.toString();
-      });
+      setState(() => _autoridades = []);
     }
   }
 
-  Authority? get _autoridadDeTipo {
-    final tipo = _tipo;
-    if (tipo == null) return null;
-    for (final a in _autoridades) {
-      if (a.tipo == tipo && a.isActive) return a;
+  String? _authorityTypeForEntity(String entityType) {
+    switch (entityType) {
+      case 'municipalidad':
+        return 'municipalidad';
+      case 'comisaria_pnp':
+        return 'comisaria';
+      case 'serenazgo':
+        return 'serenazgo';
+      default:
+        // ATU y empresas eléctricas aún no existen como tipos de autoridad
+        // en el catálogo receptor local de InsForge.
+        return null;
+    }
+  }
+
+  Authority? get _selectedAuthority {
+    final id = _selectedAuthorityId;
+    if (id == null) return null;
+    for (final authority in _autoridades) {
+      if (authority.id == id && authority.isActive) return authority;
     }
     return null;
   }
@@ -187,30 +193,38 @@ class _ComplaintConfirmationScreenState
   void _applyEntitySuggestion() {
     final entity = _entitySuggestion?.entidad;
     if (entity == null) return;
-    // El catálogo actual solo permite autoridades municipales y comisarías.
-    switch (entity.tipo) {
-      case 'municipalidad':
-        setState(() => _tipo = 'municipalidad');
-        _showMessage('Se seleccionó el tipo Municipalidad. La asignación final sigue el catálogo de entidades de DenuPe.');
-        break;
-      case 'comisaria_pnp':
-        setState(() => _tipo = 'comisaria');
-        _showMessage('Se seleccionó el tipo Comisaría. La asignación final sigue el catálogo de entidades de DenuPe.');
-        break;
-      default:
-        _showMessage(
-          'La recomendación es ' + entity.nombre +
-          '. Esta entidad sectorial aún no está registrada en el catálogo receptor de DenuPe; se mantiene la selección manual.',
-        );
+    final authorityType = _authorityTypeForEntity(entity.tipo);
+    if (authorityType == null) {
+      _showMessage(
+        'La entidad ${entity.nombre} está identificada, pero todavía no existe '
+        'un tipo receptor equivalente en DenuPe. No se asignará otra entidad en su lugar.',
+      );
+      return;
     }
+    Authority? authority;
+    for (final item in _autoridades) {
+      if (item.tipo == authorityType && item.isActive) {
+        authority = item;
+        break;
+      }
+    }
+    if (authority == null) {
+      _showMessage(
+        'La recomendación es ${entity.nombre}, pero no hay una entidad activa '
+        'de tipo ${authorityType.replaceAll('_', ' ')} en el catálogo de DenuPe.',
+      );
+      return;
+    }
+    setState(() => _selectedAuthorityId = authority!.id);
+    _showMessage(
+      'Se aceptó la recomendación. DenuPe registrará el tipo de entidad '
+      '${authority.nombre}; el directorio local aún no guarda el identificador '
+      'individual de la institución recomendada.',
+    );
   }
 
   Future<void> _confirm() async {
-    final autoridad = _autoridadDeTipo;
-    if (autoridad == null) {
-      _showMessage('No hay una entidad disponible para este tipo');
-      return;
-    }
+    final autoridad = _selectedAuthority;
     setState(() => _confirming = true);
     try {
       final complaint = await api.createComplaint(
@@ -220,7 +234,10 @@ class _ComplaintConfirmationScreenState
         address: widget.address,
         latitude: widget.latitude,
         longitude: widget.longitude,
-        autoridadId: autoridad.id,
+        // Si se aceptó una sugerencia compatible, se guarda el tipo receptor.
+        // Si no, el trigger de InsForge aplica la autoridad predeterminada
+        // configurada para la categoría.
+        autoridadId: autoridad?.id,
       );
       bumpNotificationsTick();
       for (final item in widget.media) {
@@ -278,27 +295,7 @@ class _ComplaintConfirmationScreenState
   }
 
   Widget _buildBody() {
-    if (_loading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-    if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.cloud_off, size: 48),
-            const SizedBox(height: 12),
-            const Text('No se pudieron cargar las entidades'),
-            const SizedBox(height: 12),
-            FilledButton.tonal(
-              onPressed: _loadAutoridades,
-              child: const Text('Reintentar'),
-            ),
-          ],
-        ),
-      );
-    }
-    final autoridad = _autoridadDeTipo;
+    final autoridad = _selectedAuthority;
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
@@ -311,7 +308,7 @@ class _ComplaintConfirmationScreenState
         Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(10)), child: const Row(children: [Icon(Icons.info_outline, color: DenuPeColors.primary), SizedBox(width: 8), Expanded(child: Text('Al confirmar, tu denuncia será enviada a la entidad correspondiente.'))])),
         const SizedBox(height: 16),
         Row(children: [OutlinedButton(onPressed: _confirming ? null : () => Navigator.of(context).pop(), child: const Text('Editar')), const SizedBox(width: 8), Expanded(child: FilledButton.icon(
-          onPressed: (_confirming || autoridad == null) ? null : _confirm,
+          onPressed: _confirming ? null : _confirm,
           style: FilledButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 16),
           ),
@@ -327,7 +324,8 @@ class _ComplaintConfirmationScreenState
         if (autoridad == null) ...[
           const SizedBox(height: 8),
           Text(
-            'No hay una entidad disponible para el tipo seleccionado.',
+            'Si no aceptas una sugerencia compatible, la entidad inicial se '
+            'determinará mediante la regla predeterminada de la categoría en DenuPe.',
             textAlign: TextAlign.center,
             style: Theme.of(context)
                 .textTheme
@@ -341,9 +339,16 @@ class _ComplaintConfirmationScreenState
 
   Widget _buildEntitySuggestionCard(AiEntitySuggestion suggestion) {
     final entity = suggestion.entidad;
+    final authorityType =
+        entity == null ? null : _authorityTypeForEntity(entity.tipo);
     final canApply = suggestion.sugerida &&
         entity != null &&
-        (entity.tipo == 'municipalidad' || entity.tipo == 'comisaria_pnp');
+        authorityType != null &&
+        _autoridades.any(
+          (authority) =>
+              authority.tipo == authorityType && authority.isActive,
+        );
+    final isApplied = _selectedAuthority != null;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -390,9 +395,11 @@ class _ComplaintConfirmationScreenState
           Text(suggestion.motivo),
           const SizedBox(height: 6),
           Text(
-            canApply
-                ? 'Esta es una sugerencia. Tú decides si usarla.'
-                : 'Esta entidad sectorial aún no está disponible como destino receptor en DenuPe. La recomendación es informativa.',
+            isApplied
+                ? 'Se aceptó la sugerencia. Por ahora DenuPe guarda el tipo general de entidad, no el identificador individual del organismo.'
+                : canApply
+                    ? 'Esta es una sugerencia. Tú decides si usarla.'
+                    : 'No existe un tipo receptor compatible en el catálogo actual de DenuPe. La recomendación es informativa y no se asignará otra entidad automáticamente.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 12),
@@ -417,7 +424,10 @@ class _ComplaintConfirmationScreenState
               TextButton(
                 onPressed: (_confirming || _suggestingEntity)
                     ? null
-                    : () => setState(() => _entitySuggestion = null),
+                    : () => setState(() {
+                          _entitySuggestion = null;
+                          _selectedAuthorityId = null;
+                        }),
                 child: const Text('Ignorar'),
               ),
             ],
@@ -516,11 +526,6 @@ class _ComplaintConfirmationScreenState
   }
 
   Widget _buildEntityCard(Authority? autoridad) {
-    final tipTypes = const [
-      ('municipalidad', Icons.location_city, 'Municipalidad'),
-      ('comisaria', Icons.local_police_outlined, 'Comisaría'),
-      ('serenazgo', Icons.shield_outlined, 'Serenazgo'),
-    ];
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
@@ -542,64 +547,33 @@ class _ComplaintConfirmationScreenState
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'Entidad asignada',
+                  'Asignación de entidad',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
               ],
             ),
-            const SizedBox(height: 4),
+            const SizedBox(height: 6),
             Text(
-              'La denuncia será atendida por el tipo de entidad que selecciones.',
+              autoridad == null
+                  ? 'La entidad se determinará según la categoría y las reglas de asignación de DenuPe.'
+                  : 'Se aceptó una sugerencia compatible. El registro local utilizará el tipo general de entidad.',
               style: Theme.of(context)
                   .textTheme
                   .bodySmall
                   ?.copyWith(color: Colors.grey.shade600),
             ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              children: tipTypes.map((entry) {
-                final (tipo, icon, label) = entry;
-                return ChoiceChip(
-                  selected: _tipo == tipo,
-                  avatar: Icon(icon, size: 18),
-                  label: Text(label),
-                  onSelected: _confirming
-                      ? null
-                      : (_) => setState(() => _tipo = tipo),
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: (_suggestingEntity || _confirming) ? null : _suggestEntity,
-                icon: const Icon(Icons.auto_awesome_outlined),
-                label: const Text('Recomendar entidad con IA'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  alignment: Alignment.center,
-                ),
-              ),
-            ),
-            if (_entitySuggestion != null) ...[
+            if (autoridad != null) ...[
               const SizedBox(height: 12),
-              _buildEntitySuggestionCard(_entitySuggestion!),
+              _SummaryRow(
+                label: 'Tipo receptor',
+                detail: '${autoridad.nombre} (${autoridad.sigla})',
+              ),
             ],
-            const SizedBox(height: 12),
-            _SummaryRow(
-              label: 'Entidad',
-              detail: autoridad == null
-                  ? 'No disponible'
-                  : '${autoridad.nombre} (${autoridad.sigla})',
-            ),
           ],
         ),
       ),
     );
-  }
-}
+  }}
 
 class _SummaryRow extends StatelessWidget {
   const _SummaryRow({required this.label, required this.detail});
