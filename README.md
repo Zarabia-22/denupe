@@ -1,98 +1,123 @@
-﻿# DenuPe
+# DenuPe
 
-Aplicación móvil de **denuncias ciudadanas**: los vecinos reportan problemas de su distrito (alumbrado, seguridad, limpieza, agua, etc.) y las entidades responsables (municipalidad, comisaría, serenazgo) los reciben, se asignan y se atienden hasta su resolución.
+Aplicación móvil de **denuncias ciudadanas** desarrollada con Flutter e InsForge. Permite registrar incidencias, adjuntar evidencias, seleccionar manualmente una institución competente y consultar una recomendación de IA como ayuda opcional.
 
-> **Versión:** 1.2.0 — Flutter / InsForge (Postgres BaaS)
+> **Versión del paquete:** 1.4.2 — Flutter / InsForge (Postgres BaaS) / FastAPI (servicio de IA).
 
 ---
 
 ## Funcionalidades
 
 ### Ciudadanos
-- **Cuenta y perfil**: registro with verificación de correo, inicio de sesión y perfil editable (nombre, DNI, teléfono, distrito). La denuncia se bloquea si el perfil está incompleto.
-- **Nueva denuncia**: formulario con categoría, título, descripción, dirección, ubicación GPS y hasta 5 fotos/videos. Los datos del denunciante se toman automáticamente del perfil.
-- **Confirmación previa**: antes de terminar se muestra un resumen de la denuncia y el ciudadano elige el **tipo de entidad** que la atenderá (Municipalidad / Comisaría / Serenazgo).
-- **Seguimiento**: "Mis denuncias" muestra el estado en tiempo real (Recibida → En revisión → En proceso → Resuelta), historial y evidencias adjuntas.
-- **Alertas**: notificaciones in-app en tiempo real de cada cambio de estado.
+- Registro, verificación de correo, inicio de sesión y perfil editable.
+- Nueva denuncia con categoría, título, descripción, dirección, GPS y hasta 5 fotos o videos.
+- Selección manual de destinos públicos disponibles según categoría y territorio.
+- Recomendación opcional de categoría y entidad mediante IA; el ciudadano conserva la decisión final.
+- Si no existe una institución verificable, la denuncia puede dirigirse a la bandeja interna de revisión de competencia. Esta bandeja no se presenta como entidad pública.
+- Seguimiento de estados, historial, evidencias y notificaciones en tiempo real.
 
-### Funcionarios (entidades)
-- **Panel**: lista de denuncias asignadas a su entidad, con datos del denunciante para contactarlo.
-- **Gestión de estados**: cambia el estado de cada denuncia con nota opcional; el ciudadano recibe la alerta al instante.
+### Funcionarios
+- Panel de denuncias asignadas a la entidad receptora.
+- Consulta de información y evidencias de la denuncia.
+- Actualización del estado con una nota opcional.
 
 ---
 
 ## Descarga e instalación
 
-### Opción 1: desde GitHub Releases (recomendada)
-1. Abre [v1.2.0](https://github.com/Zarabia-22/denupe/releases/tag/v1.2.0).
-2. Descarga el archivo denupe-1.2.0.apk.
-3. En el teléfono Android, abre el archivo descargado y permite la instalación desde orígenes desconocidos si lo solicita.
-4. Confirma la instalación y abre **DenuPe**.
-
-### Cuenta demo (funcionario)
-- **Correo:** uncionario.municipal@denupe.test
-- **Contraseña:** Funcionario123
+Consulta los [GitHub Releases](https://github.com/Zarabia-22/denupe/releases) para obtener una versión publicada. La configuración del APK distribuido depende de las variables incorporadas durante su compilación.
 
 ---
 
 ## Desarrollo local
 
 ### Requisitos
-- [Flutter SDK](https://docs.flutter.dev/get-started/install)
-- [Git](https://git-scm.com/)
-- [Visual Studio Code](https://code.visualstudio.com/) con extensiones Flutter y Dart
-- (Opcional) Android Studio / emulador Android
-- (Opcional) Python 3 para servir build web
+- Flutter SDK compatible con Dart `^3.13.4`.
+- Git.
+- Visual Studio Code con las extensiones Flutter y Dart.
+- Android Studio/emulador o un dispositivo Android (opcional).
 
-### 1) Clonar el repositorio
-`ash
+### 1. Clonar el repositorio
+
+```bash
 git clone https://github.com/Zarabia-22/denupe.git
 cd denupe
-`
+```
 
-### 2) Configurar VS Code
-1. Abrir VS Code → Archivo > Abrir carpeta... → seleccionar denupe.
-2. Instalar extensiones Flutter y Dart si no las tienes.
-3. Usar Flutter: Select Device (Ctrl+Shift+P) para elegir dispositivo/emulador/navegador.
+### 2. Configurar variables de entorno
 
-### 3) Instalar dependencias
-`ash
+El archivo `.env` está excluido de Git porque contiene credenciales. Créalo a partir de la plantilla:
+
+**Windows (PowerShell):**
+```powershell
+Copy-Item .env.example .env
+```
+
+**macOS / Linux:**
+```bash
+cp .env.example .env
+```
+
+Edita `.env` y configura valores reales:
+
+- `INSFORGE_URL`: URL del proyecto InsForge.
+- `INSFORGE_ANON_KEY`: clave pública/anon del proyecto.
+- `DENUPE_IA_URL`: URL base HTTPS del backend FastAPI de DenuPe, sin barra final (por ejemplo, el servicio de pruebas HU-IA02 indicado en la plantilla).
+
+No sustituyas las credenciales por valores ficticios ni publiques el archivo `.env`. El catálogo de instituciones para la selección manual y las recomendaciones de IA comparten este servicio, por lo que `DENUPE_IA_URL` es necesaria para disponer de ambas funciones. Si el servicio no responde, la app informa del problema y permite reintentar el catálogo; la denuncia aún puede continuar con la asignación de respaldo configurada en InsForge. La app no apunta silenciosamente a un servidor de pruebas.
+
+### 3. Instalar dependencias
+
+```bash
 flutter pub get
-`
+```
 
-### 4) Levantar en servidor local HTTP (web)
-`ash
-# Compilar
-flutter build web --release
+### 4. Ejecutar la aplicación
 
-# Servir
-cd build/web
-python -m http.server 8080
-# o: py -m http.server 8080
-`
-Abrir [http://localhost:8080](http://localhost:8080)
-
-### 5) Ejecutar en desarrollo
-`ash
+```bash
 # Web
 flutter run -d chrome
 
-# Android (emulador/dispositivo)
+# Android
 flutter run -d android
+```
 
-# Windows (si habilitado)
-flutter run -d windows
-`
+### 5. Compilar Android
+
+```bash
+flutter build apk --release
+```
+
+Para compilar la web:
+
+```bash
+flutter build web --release
+cd build/web
+python -m http.server 8080
+```
+
+Abre http://localhost:8080.
 
 ---
 
-## Requisitos mínimos
-- Android 8.0 (API 26) o superior
-- Conexión a internet
+## Integración con el backend de IA
+
+La app consume estos endpoints del servicio FastAPI:
+
+- `GET /api/entidades/disponibles`: catálogo elegible por categoría y territorio.
+- `POST /api/ia/sugerir-categoria`: sugerencia basada en título y descripción.
+- `POST /api/ia/sugerir-entidad`: recomendación de destino público o abstención hacia revisión de competencia.
+- `GET /health`: estado del servicio.
+
+La URL se configura exclusivamente mediante `DENUPE_IA_URL`. El catálogo manual y las recomendaciones dependen de este servicio; si no responde, la app muestra el error y permite reintentar. La asignación de respaldo de InsForge evita bloquear el envío de la denuncia. Una recomendación de IA nunca se aplica sin confirmación del ciudadano.
+
+**Cobertura territorial:** el catálogo de entidades descrito por el backend tiene cobertura inicial en Lima Metropolitana y Callao. La aplicación no debe asumir que una entidad está disponible para distritos o competencias que el backend no haya verificado.
+
+---
 
 ## Soporte
-Reporta incidencias en [https://github.com/Zarabia-22/denupe/issues](https://github.com/Zarabia-22/denupe/issues)
 
+Reporta incidencias en [GitHub Issues](https://github.com/Zarabia-22/denupe/issues).
 ## Catálogo nacional de entidades por distrito (asignación solo con GPS)
 
 La migración `20261119010000_catalogo_nacional_entidades_por_distrito_gps.sql` crea:
