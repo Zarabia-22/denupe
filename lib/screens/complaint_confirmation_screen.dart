@@ -213,6 +213,7 @@ class _ComplaintConfirmationScreenState
     setState(() {
       _entitySuggestion = null;
       _selectedAuthorityId = null;
+      _selectedPublicEntity = null;
     });
 
     // Mantiene el mismo diálogo de análisis utilizado por la sugerencia de categoría.
@@ -662,7 +663,7 @@ class _ComplaintConfirmationScreenState
             if (_selectedPublicEntity != null) ...[
               const SizedBox(height: 4),
               Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Icon(Icons.check_circle, color: DenuPeColors.accent, size: 18),
+                const Icon(Icons.check_circle, color: DenuPeColors.success, size: 18),
                 const SizedBox(width: 6),
                 Expanded(child: Text('Seleccionada: ${_selectedPublicEntity!.nombre}',
                     style: const TextStyle(fontWeight: FontWeight.w600))),
