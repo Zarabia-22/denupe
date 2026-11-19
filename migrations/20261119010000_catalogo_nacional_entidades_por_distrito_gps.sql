@@ -2173,4 +2173,41 @@ BEGIN
 END;
 $;
 
+
+-- Devuelve la matriz completa (ocho categorías) de un distrito ya resuelto por GPS.
+-- Es de solo lectura: no asigna ninguna entidad a una denuncia.
+CREATE OR REPLACE FUNCTION public.consultar_matriz_distrital_por_ubigeo(
+  p_ubigeo TEXT
+)
+RETURNS TABLE (
+  ubigeo TEXT,
+  departamento TEXT,
+  provincia TEXT,
+  distrito TEXT,
+  categoria_code TEXT,
+  entidad_resolucion_id TEXT,
+  entidad_nombre TEXT,
+  entidad_tipo TEXT,
+  metodo_resolucion TEXT,
+  requiere_gps BOOLEAN,
+  asignar_solo_tras_gps BOOLEAN
+)
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $
+  SELECT d.ubigeo::TEXT, d.departamento, d.provincia, d.distrito,
+         m.categoria_code, er.id, er.nombre, er.tipo,
+         er.metodo_resolucion, m.requiere_gps, m.asignar_solo_tras_gps
+  FROM public.distritos_peru d
+  JOIN public.distrito_categoria_entidad m ON m.ubigeo = d.ubigeo
+  JOIN public.entidades_resolucion er ON er.id = m.entidad_resolucion_id
+  WHERE d.ubigeo = p_ubigeo
+    AND er.activo = TRUE
+  ORDER BY m.categoria_code;
+$;
+REVOKE ALL ON FUNCTION public.consultar_matriz_distrital_por_ubigeo(TEXT) FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.consultar_matriz_distrital_por_ubigeo(TEXT) TO anon, authenticated;
+
 COMMIT;
