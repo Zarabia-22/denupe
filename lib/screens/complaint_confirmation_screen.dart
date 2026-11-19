@@ -6,6 +6,7 @@ import 'package:insforge_flutter/insforge_flutter.dart';
 
 import '../models.dart';
 import '../services/app_scope.dart';
+import '../services/ai_entity_service.dart';
 
 class ComplaintConfirmationScreen extends StatefulWidget {
   const ComplaintConfirmationScreen({
@@ -18,6 +19,7 @@ class ComplaintConfirmationScreen extends StatefulWidget {
     this.longitude,
     required this.media,
     required this.categories,
+    this.district,
   });
 
   final String categoryId;
@@ -28,6 +30,7 @@ class ComplaintConfirmationScreen extends StatefulWidget {
   final double? longitude;
   final List<ComplaintAttachment> media;
   final List<Category> categories;
+  final String? district;
 
   @override
   State<ComplaintConfirmationScreen> createState() =>
@@ -41,6 +44,8 @@ class _ComplaintConfirmationScreenState
   String? _error;
   String? _tipo = 'municipalidad';
   bool _confirming = false;
+  bool _suggestingEntity = false;
+  AiEntitySuggestion? _entitySuggestion;
 
   @override
   void initState() {
@@ -83,6 +88,101 @@ class _ComplaintConfirmationScreenState
       if (c.id == widget.categoryId) return c.name;
     }
     return categoryNameFromCache(widget.categoryId);
+  }
+
+  Map<String, String>? _territoryForDistrict(String? value) {
+    if (value == null || value.trim().isEmpty) return null;
+    String normalize(String text) => text.toLowerCase().trim()
+        .replaceAll(RegExp(r'[áàäâ]'), 'a')
+        .replaceAll(RegExp(r'[éèëê]'), 'e')
+        .replaceAll(RegExp(r'[íìïî]'), 'i')
+        .replaceAll(RegExp(r'[óòöô]'), 'o')
+        .replaceAll(RegExp(r'[úùüû]'), 'u')
+        .replaceAll('ñ', 'n')
+        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+        .trim();
+
+    final district = normalize(value);
+    const callaoDistricts = {
+      'callao', 'bellavista', 'carmen de la legua reynoso',
+      'la perla', 'la punta', 'mi peru', 'ventanilla',
+    };
+    const limaDistricts = {
+      'lima', 'ancon', 'ate', 'barranco', 'brena', 'carabayllo',
+      'chaclacayo', 'chorrillos', 'cieneguilla', 'comas', 'el agustino',
+      'independencia', 'jesus maria', 'la molina', 'la victoria', 'lince',
+      'los olivos', 'lurigancho', 'lurin', 'magdalena del mar', 'miraflores',
+      'pachacamac', 'pucusana', 'pueblo libre', 'puente piedra',
+      'punta hermosa', 'punta negra', 'rimac', 'san bartolo', 'san borja',
+      'san isidro', 'san juan de lurigancho', 'san juan de miraflores',
+      'san luis', 'san martin de porres', 'san miguel', 'santa anita',
+      'santa maria del mar', 'santa rosa', 'santiago de surco', 'surquillo',
+      'villa el salvador', 'villa maria del triunfo',
+    };
+    if (callaoDistricts.contains(district)) {
+      return {'departamento': 'Callao', 'provincia': 'Callao'};
+    }
+    if (limaDistricts.contains(district)) {
+      return {'departamento': 'Lima', 'provincia': 'Lima'};
+    }
+    return null;
+  }
+
+  Future<void> _suggestEntity() async {
+    if (_suggestingEntity || _confirming) return;
+    final territory = _territoryForDistrict(widget.district);
+    if (territory == null) {
+      _showMessage(
+        'Completa tu distrito en el perfil con un distrito de Lima Metropolitana o Callao para consultar la entidad competente.',
+      );
+      return;
+    }
+    setState(() {
+      _suggestingEntity = true;
+      _entitySuggestion = null;
+    });
+    try {
+      final suggestion = await AiEntityService().sugerirEntidad(
+        categoria: _categoryName(),
+        departamento: territory['departamento']!,
+        provincia: territory['provincia']!,
+        distrito: widget.district!.trim(),
+        titulo: widget.title,
+        descripcion: widget.description,
+        latitud: widget.latitude,
+        longitud: widget.longitude,
+      );
+      if (!mounted) return;
+      setState(() => _entitySuggestion = suggestion);
+      if (!suggestion.sugerida || suggestion.entidad == null) {
+        _showMessage(suggestion.motivo);
+      }
+    } on AiEntityException catch (e) {
+      if (mounted) _showMessage(e.message);
+    } finally {
+      if (mounted) setState(() => _suggestingEntity = false);
+    }
+  }
+
+  void _applyEntitySuggestion() {
+    final entity = _entitySuggestion?.entidad;
+    if (entity == null) return;
+    // El catálogo actual solo permite autoridades municipales y comisarías.
+    switch (entity.tipo) {
+      case 'municipalidad':
+        setState(() => _tipo = 'municipalidad');
+        _showMessage('Se seleccionó el tipo Municipalidad. La asignación final sigue el catálogo de entidades de DenuPe.');
+        break;
+      case 'comisaria_pnp':
+        setState(() => _tipo = 'comisaria');
+        _showMessage('Se seleccionó el tipo Comisaría. La asignación final sigue el catálogo de entidades de DenuPe.');
+        break;
+      default:
+        _showMessage(
+          'La recomendación es ' + entity.nombre +
+          '. Esta entidad sectorial aún no está registrada en el catálogo receptor de DenuPe; se mantiene la selección manual.',
+        );
+    }
   }
 
   Future<void> _confirm() async {
@@ -216,6 +316,83 @@ class _ComplaintConfirmationScreenState
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildEntitySuggestionCard(AiEntitySuggestion suggestion) {
+    final entity = suggestion.entidad;
+    final canApply = suggestion.sugerida &&
+        entity != null &&
+        (entity.tipo == 'municipalidad' || entity.tipo == 'comisaria_pnp');
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: DenuPeColors.primary.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: DenuPeColors.primary.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.auto_awesome, color: DenuPeColors.primary, size: 19),
+              SizedBox(width: 8),
+              Expanded(
+                child: Text('Resultado de recomendación',
+                    style: TextStyle(fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          if (entity == null)
+            const Text('No se encontró una entidad verificable.')
+          else ...[
+            Text(entity.nombre,
+                style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 4),
+            Text('Tipo: ' + entity.tipo.replaceAll('_', ' ')),
+            if (entity.ambito.isNotEmpty)
+              Text('Ámbito: ' + entity.ambito.values.join(' · ')),
+            if (entity.direccion != null && entity.direccion!.isNotEmpty)
+              Text('Dirección: ' + entity.direccion!),
+            if (entity.telefono != null && entity.telefono!.isNotEmpty)
+              Text('Teléfono: ' + entity.telefono!),
+            if (entity.sitioWeb != null && entity.sitioWeb!.isNotEmpty)
+              Text('Web: ' + entity.sitioWeb!),
+          ],
+          const SizedBox(height: 8),
+          Text(suggestion.motivo,
+              style: Theme.of(context).textTheme.bodySmall),
+          if (canApply) ...[
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton.tonalIcon(
+                onPressed: (_confirming || _suggestingEntity)
+                    ? null
+                    : _applyEntitySuggestion,
+                icon: const Icon(Icons.check_circle_outline),
+                label: const Text('Usar tipo recomendado'),
+              ),
+            ),
+          ] else if (entity != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Esta entidad no está registrada todavía como destino receptor en DenuPe. La recomendación es informativa y debes conservar o elegir manualmente un destino compatible.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+          ],
+          const SizedBox(height: 4),
+          Text(
+            'La recomendación no realiza una derivación automática; verifica la entidad antes de enviar.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey.shade700,
+                ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -362,6 +539,30 @@ class _ComplaintConfirmationScreenState
                 );
               }).toList(),
             ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: (_suggestingEntity || _confirming) ? null : _suggestEntity,
+                icon: _suggestingEntity
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.auto_awesome_outlined),
+                label: Text(_suggestingEntity
+                    ? 'Consultando entidad competente...'
+                    : 'Recomendar entidad con IA'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+              ),
+            ),
+            if (_entitySuggestion != null) ...[
+              const SizedBox(height: 12),
+              _buildEntitySuggestionCard(_entitySuggestion!),
+            ],
             const SizedBox(height: 12),
             _SummaryRow(
               label: 'Entidad',
