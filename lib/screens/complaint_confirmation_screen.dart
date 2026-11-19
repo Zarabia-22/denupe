@@ -289,9 +289,8 @@ class _ComplaintConfirmationScreenState
         address: widget.address,
         latitude: widget.latitude,
         longitude: widget.longitude,
-        // Si se aceptó una sugerencia compatible, se guarda el tipo receptor.
-        // Si no, el trigger de InsForge aplica la autoridad predeterminada
-        // configurada para la categoría.
+        // Se conserva el receptor interno y el identificador exacto de la institución.
+        // Si no hay selección, el trigger aplica la bandeja de revisión de competencia.
         autoridadId: autoridad?.id,
         entidadPublicaId: _selectedPublicEntity?.id,
         entidadPublicaNombre: _selectedPublicEntity?.nombre,
@@ -362,7 +361,7 @@ class _ComplaintConfirmationScreenState
         const SizedBox(height: 16),
         _buildEntityCard(autoridad),
         const SizedBox(height: 12),
-        Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(10)), child: const Row(children: [Icon(Icons.info_outline, color: DenuPeColors.primary), SizedBox(width: 8), Expanded(child: Text('Al confirmar, tu denuncia será enviada a la entidad correspondiente.'))])),
+        Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(10)), child: const Row(children: [Icon(Icons.info_outline, color: DenuPeColors.primary), SizedBox(width: 8), Expanded(child: Text('Al confirmar, tu denuncia se asignará a la institución seleccionada o pasará a revisión de competencia si no hay una opción única validada.'))])),
         const SizedBox(height: 16),
         Row(children: [OutlinedButton(onPressed: _confirming ? null : () => Navigator.of(context).pop(), child: const Text('Editar')), const SizedBox(width: 8), Expanded(child: FilledButton.icon(
           onPressed: _confirming ? null : _confirm,
