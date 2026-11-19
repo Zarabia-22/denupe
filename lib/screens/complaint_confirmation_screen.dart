@@ -141,8 +141,18 @@ class _ComplaintConfirmationScreenState
       _suggestingEntity = true;
       _entitySuggestion = null;
     });
+
+    // Mantiene el mismo diálogo de análisis utilizado por la sugerencia de categoría.
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const _EntitySuggestionLoadingDialog(),
+    );
+
+    AiEntitySuggestion? suggestion;
+    String? error;
     try {
-      final suggestion = await AiEntityService().sugerirEntidad(
+      suggestion = await AiEntityService().sugerirEntidad(
         categoria: _categoryName(),
         departamento: territory['departamento']!,
         provincia: territory['provincia']!,
@@ -152,16 +162,26 @@ class _ComplaintConfirmationScreenState
         latitud: widget.latitude,
         longitud: widget.longitude,
       );
-      if (!mounted) return;
-      setState(() => _entitySuggestion = suggestion);
-      if (!suggestion.sugerida || suggestion.entidad == null) {
-        _showMessage(suggestion.motivo);
-      }
     } on AiEntityException catch (e) {
-      if (mounted) _showMessage(e.message);
+      error = e.message;
+    } catch (_) {
+      error = 'No se pudo obtener la recomendación. Puedes elegir el destino manualmente.';
     } finally {
-      if (mounted) setState(() => _suggestingEntity = false);
+      if (mounted) {
+        Navigator.of(context, rootNavigator: true).pop();
+        setState(() => _suggestingEntity = false);
+      }
     }
+    if (!mounted) return;
+    if (error != null) {
+      _showMessage(error);
+      return;
+    }
+    if (suggestion?.sugerida != true || suggestion?.entidad == null) {
+      _showMessage(suggestion?.motivo ?? 'No se encontró una entidad verificable.');
+      return;
+    }
+    setState(() => _entitySuggestion = suggestion);
   }
 
   void _applyEntitySuggestion() {
@@ -326,31 +346,35 @@ class _ComplaintConfirmationScreenState
         (entity.tipo == 'municipalidad' || entity.tipo == 'comisaria_pnp');
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: DenuPeColors.primary.withValues(alpha: 0.07),
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: DenuPeColors.primary.withValues(alpha: 0.3)),
+        color: DenuPeColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: DenuPeColors.primary.withValues(alpha: 0.35),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.auto_awesome, color: DenuPeColors.primary, size: 19),
+              Icon(Icons.auto_awesome_outlined, color: DenuPeColors.primary),
               SizedBox(width: 8),
               Expanded(
-                child: Text('Resultado de recomendación',
-                    style: TextStyle(fontWeight: FontWeight.w700)),
+                child: Text(
+                  'Entidad sugerida por IA',
+                  style: TextStyle(fontWeight: FontWeight.w600),
+                ),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          if (entity == null)
-            const Text('No se encontró una entidad verificable.')
-          else ...[
-            Text(entity.nombre,
-                style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 8),
+          Text(
+            entity?.nombre ?? 'Entidad no disponible',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          if (entity != null) ...[
             const SizedBox(height: 4),
             Text('Tipo: ' + entity.tipo.replaceAll('_', ' ')),
             if (entity.ambito.isNotEmpty)
@@ -362,34 +386,41 @@ class _ComplaintConfirmationScreenState
             if (entity.sitioWeb != null && entity.sitioWeb!.isNotEmpty)
               Text('Web: ' + entity.sitioWeb!),
           ],
-          const SizedBox(height: 8),
-          Text(suggestion.motivo,
-              style: Theme.of(context).textTheme.bodySmall),
-          if (canApply) ...[
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerLeft,
-              child: FilledButton.tonalIcon(
+          const SizedBox(height: 6),
+          Text(suggestion.motivo),
+          const SizedBox(height: 6),
+          Text(
+            canApply
+                ? 'Esta es una sugerencia. Tú decides si usarla.'
+                : 'Esta entidad sectorial aún no está disponible como destino receptor en DenuPe. La recomendación es informativa.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              if (canApply)
+                FilledButton.icon(
+                  onPressed: (_confirming || _suggestingEntity)
+                      ? null
+                      : _applyEntitySuggestion,
+                  icon: const Icon(Icons.check),
+                  label: const Text('Usar sugerencia'),
+                ),
+              OutlinedButton(
                 onPressed: (_confirming || _suggestingEntity)
                     ? null
-                    : _applyEntitySuggestion,
-                icon: const Icon(Icons.check_circle_outline),
-                label: const Text('Usar tipo recomendado'),
+                    : _suggestEntity,
+                child: const Text('Volver a sugerir'),
               ),
-            ),
-          ] else if (entity != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              'Esta entidad no está registrada todavía como destino receptor en DenuPe. La recomendación es informativa y debes conservar o elegir manualmente un destino compatible.',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-          const SizedBox(height: 4),
-          Text(
-            'La recomendación no realiza una derivación automática; verifica la entidad antes de enviar.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey.shade700,
-                ),
+              TextButton(
+                onPressed: (_confirming || _suggestingEntity)
+                    ? null
+                    : () => setState(() => _entitySuggestion = null),
+                child: const Text('Ignorar'),
+              ),
+            ],
           ),
         ],
       ),
@@ -544,18 +575,11 @@ class _ComplaintConfirmationScreenState
               width: double.infinity,
               child: OutlinedButton.icon(
                 onPressed: (_suggestingEntity || _confirming) ? null : _suggestEntity,
-                icon: _suggestingEntity
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.auto_awesome_outlined),
-                label: Text(_suggestingEntity
-                    ? 'Consultando entidad competente...'
-                    : 'Recomendar entidad con IA'),
+                icon: const Icon(Icons.auto_awesome_outlined),
+                label: const Text('Recomendar entidad con IA'),
                 style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  alignment: Alignment.center,
                 ),
               ),
             ),
@@ -664,3 +688,28 @@ class _ReviewSteps extends StatelessWidget {
     );
   }
 }
+
+/// Diálogo de carga compartiendo el patrón visual de la recomendación de categoría.
+class _EntitySuggestionLoadingDialog extends StatelessWidget {
+  const _EntitySuggestionLoadingDialog();
+
+  @override
+  Widget build(BuildContext context) {
+    return const PopScope(
+      canPop: false,
+      child: AlertDialog(
+        title: Text('Sugerencia con IA'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('Analizando la denuncia y su ubicación'),
+            SizedBox(height: 16),
+            LinearProgressIndicator(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
