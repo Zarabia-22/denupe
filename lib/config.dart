@@ -24,7 +24,7 @@ abstract final class Config {
     final value = dotenv.env['DENUPE_IA_URL']?.trim();
     // Servicio público de IA; .env permite usar un entorno alternativo.
     return (value == null || value.isEmpty)
-        ? 'https://denupe-ia-backend.onrender.com'
+        ? 'https://denupe-ia-backend-hu-ia02-test.onrender.com'
         : value;
   }
 }
