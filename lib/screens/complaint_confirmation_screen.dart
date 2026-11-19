@@ -531,8 +531,9 @@ class _ComplaintConfirmationScreenState
                 onPressed: (_confirming || _suggestingEntity)
                     ? null
                     : () => setState(() {
+                          // Ignorar solo descarta la recomendación de IA.
+                          // No debe borrar una selección manual previa.
                           _entitySuggestion = null;
-                          _selectedAuthorityId = null;
                         }),
                 child: const Text('Ignorar'),
               ),
