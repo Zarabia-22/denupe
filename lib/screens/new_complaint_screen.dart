@@ -498,7 +498,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-
+              ..._buildContactSection(),
               TextFormField(
                 controller: _title,
                 focusNode: _titleFocus,

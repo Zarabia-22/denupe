@@ -69,6 +69,11 @@ class AiEntitySuggestion {
 
 /// Cliente del endpoint HU-IA02 del backend FastAPI.
 class AiEntityService {
+  static final http.Client _sharedClient = http.Client();
+
+  AiEntityService({http.Client? client}) : _httpClient = client ?? _sharedClient;
+
+  final http.Client _httpClient;
 
   /// Obtiene instituciones elegibles para que el ciudadano las seleccione manualmente.
   Future<List<AiPublicEntity>> listarEntidadesDisponibles({
@@ -93,7 +98,7 @@ class AiEntityService {
       if (longitud != null) 'longitud': longitud.toString(),
     });
     try {
-      final response = await http.get(uri).timeout(const Duration(seconds: 15));
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 15));
       if (response.statusCode != 200) {
         throw const AiEntityException('No se pudo cargar el catálogo de instituciones.');
       }
@@ -150,7 +155,7 @@ class AiEntityService {
     };
 
     try {
-      final response = await http
+      final response = await _httpClient
           .post(
             uri,
             headers: {'Content-Type': 'application/json'},

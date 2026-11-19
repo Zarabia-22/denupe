@@ -1,6 +1,13 @@
+import 'dart:convert';
+
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'package:denupe/models.dart';
+import 'package:denupe/services/ai_category_service.dart';
+import 'package:denupe/services/ai_entity_service.dart';
 
 void main() {
   group('models', () {
@@ -185,4 +192,121 @@ void main() {
       expect(video.isImage, isFalse);
     });
   });
+
+  group('contratos del servicio de IA', () {
+    test('AiEntityService envía contexto territorial y procesa la sugerencia', () async {
+      dotenv.loadFromString(envString: 'DENUPE_IA_URL=https://api.example.test');
+      final client = MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.path, '/api/ia/sugerir-entidad');
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['categoria'], 'Agua y saneamiento');
+        expect(body['departamento'], 'Lima');
+        expect(body['provincia'], 'Lima');
+        expect(body['distrito'], 'Miraflores');
+        expect(body['titulo'], 'Fuga de agua');
+        expect(body['descripcion'], 'Hay una tubería rota en la vereda.');
+        expect(body['latitud'], -12.12);
+        expect(body['longitud'], -77.03);
+        return http.Response(
+          jsonEncode({
+            'sugerida': true,
+            'motivo': 'La incidencia corresponde a saneamiento.',
+            'entidad': {
+              'id': 'sedapal-lima-callao',
+              'nombre': 'SEDAPAL',
+              'tipo': 'empresa_saneamiento',
+              'ambito': {
+                'departamento': 'Lima',
+                'provincia': 'Lima',
+                'distrito': 'Miraflores',
+              },
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final suggestion = await AiEntityService(client: client).sugerirEntidad(
+        categoria: 'Agua y saneamiento',
+        departamento: 'Lima',
+        provincia: 'Lima',
+        distrito: 'Miraflores',
+        titulo: 'Fuga de agua',
+        descripcion: 'Hay una tubería rota en la vereda.',
+        latitud: -12.12,
+        longitud: -77.03,
+      );
+      client.close();
+
+      expect(suggestion.sugerida, isTrue);
+      expect(suggestion.entidad?.id, 'sedapal-lima-callao');
+      expect(suggestion.entidad?.tipo, 'empresa_saneamiento');
+    });
+
+    test('AiCategorySuggestion acepta la respuesta vigente del backend', () {
+      final suggestion = AiCategorySuggestion.fromJson({
+        'sugerida': true,
+        'categoria': 'Vialidad e infraestructura',
+        'confianza_modelo': 0.91,
+        'cobertura_vocabulario': 0.84,
+        'motivo': null,
+      });
+
+      expect(suggestion.sugerida, isTrue);
+      expect(suggestion.categoria, 'Vialidad e infraestructura');
+      expect(suggestion.motivo, isNull);
+    });
+
+    test('AiEntitySuggestion parsea una entidad pública especializada', () {
+      final suggestion = AiEntitySuggestion.fromJson({
+        'sugerida': true,
+        'motivo': 'La competencia corresponde al servicio de saneamiento.',
+        'entidad': {
+          'id': 'sedapal-001',
+          'nombre': 'SEDAPAL',
+          'tipo': 'empresa_saneamiento',
+          'direccion': null,
+          'telefono': null,
+          'sitio_web': 'https://www.sedapal.com.pe',
+          'ambito': {'departamento': 'Lima', 'provincia': 'Lima'},
+        },
+      });
+
+      expect(suggestion.sugerida, isTrue);
+      expect(suggestion.entidad?.id, 'sedapal-001');
+      expect(suggestion.entidad?.tipo, 'empresa_saneamiento');
+      expect(suggestion.entidad?.ambito['provincia'], 'Lima');
+    });
+
+    test('AiEntitySuggestion reconoce revisión de competencia como destino interno', () {
+      final suggestion = AiEntitySuggestion.fromJson({
+        'sugerida': true,
+        'motivo': 'No se pudo identificar una única institución competente.',
+        'entidad': {
+          'id': 'revision-competencia',
+          'nombre': 'Revisión de competencia',
+          'tipo': 'revision_competencia',
+          'ambito': <String, dynamic>{},
+        },
+      });
+
+      expect(suggestion.entidad?.tipo, 'revision_competencia');
+      expect(suggestion.entidad?.ambito, isEmpty);
+    });
+
+    test('AiEntitySuggestion tolera abstención sin entidad', () {
+      final suggestion = AiEntitySuggestion.fromJson({
+        'sugerida': false,
+        'motivo': 'No hay información territorial suficiente.',
+        'entidad': null,
+      });
+
+      expect(suggestion.sugerida, isFalse);
+      expect(suggestion.entidad, isNull);
+      expect(suggestion.motivo, contains('territorial'));
+    });
+  });
+
 }
