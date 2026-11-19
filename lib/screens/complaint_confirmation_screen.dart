@@ -563,13 +563,42 @@ class _ComplaintConfirmationScreenState
             const SizedBox(height: 6),
             Text(
               autoridad == null
-                  ? 'La entidad se determinará según la categoría y las reglas de asignación de DenuPe.'
+                  ? 'La entidad se determinará según la categoría y las reglas de asignación de DenuPe. Puedes consultar una recomendación de IA antes de confirmar.'
                   : 'Se aceptó una sugerencia compatible. El registro local utilizará el tipo general de entidad.',
               style: Theme.of(context)
                   .textTheme
                   .bodySmall
                   ?.copyWith(color: Colors.grey.shade600),
             ),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: (_suggestingEntity || _confirming)
+                    ? null
+                    : _suggestEntity,
+                icon: _suggestingEntity
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.auto_awesome_outlined),
+                label: Text(
+                  _suggestingEntity
+                      ? 'Analizando denuncia...'
+                      : 'Recomendar entidad con IA',
+                ),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  alignment: Alignment.center,
+                ),
+              ),
+            ),
+            if (_entitySuggestion != null) ...[
+              const SizedBox(height: 12),
+              _buildEntitySuggestionCard(_entitySuggestion!),
+            ],
             if (autoridad != null) ...[
               const SizedBox(height: 12),
               _SummaryRow(
