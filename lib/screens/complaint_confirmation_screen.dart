@@ -143,6 +143,11 @@ class _ComplaintConfirmationScreenState
       );
       return;
     }
+    // Espera el catálogo local antes de decidir si la recomendación puede
+    // convertirse en uno de los tipos receptores que DenuPe almacena.
+    if (_autoridades.isEmpty) {
+      await _loadAutoridades();
+    }
     setState(() {
       _suggestingEntity = true;
       _entitySuggestion = null;
@@ -574,7 +579,8 @@ class _ComplaintConfirmationScreenState
         ),
       ),
     );
-  }}
+  }
+}
 
 class _SummaryRow extends StatelessWidget {
   const _SummaryRow({required this.label, required this.detail});
