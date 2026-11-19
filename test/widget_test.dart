@@ -1,4 +1,9 @@
+import 'dart:convert';
+
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
+import 'package:http/testing.dart';
 
 import 'package:denupe/models.dart';
 import 'package:denupe/services/ai_category_service.dart';
@@ -189,6 +194,57 @@ void main() {
   });
 
   group('contratos del servicio de IA', () {
+    test('AiEntityService envía contexto territorial y procesa la sugerencia', () async {
+      dotenv.testLoad(fileInput: 'DENUPE_IA_URL=https://api.example.test');
+      final client = MockClient((request) async {
+        expect(request.method, 'POST');
+        expect(request.url.path, '/api/ia/sugerir-entidad');
+        final body = jsonDecode(request.body) as Map<String, dynamic>;
+        expect(body['categoria'], 'Agua y saneamiento');
+        expect(body['departamento'], 'Lima');
+        expect(body['provincia'], 'Lima');
+        expect(body['distrito'], 'Miraflores');
+        expect(body['titulo'], 'Fuga de agua');
+        expect(body['descripcion'], 'Hay una tubería rota en la vereda.');
+        expect(body['latitud'], -12.12);
+        expect(body['longitud'], -77.03);
+        return http.Response(
+          jsonEncode({
+            'sugerida': true,
+            'motivo': 'La incidencia corresponde a saneamiento.',
+            'entidad': {
+              'id': 'sedapal-lima-callao',
+              'nombre': 'SEDAPAL',
+              'tipo': 'empresa_saneamiento',
+              'ambito': {
+                'departamento': 'Lima',
+                'provincia': 'Lima',
+                'distrito': 'Miraflores',
+              },
+            },
+          }),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
+      });
+
+      final suggestion = await AiEntityService(client: client).sugerirEntidad(
+        categoria: 'Agua y saneamiento',
+        departamento: 'Lima',
+        provincia: 'Lima',
+        distrito: 'Miraflores',
+        titulo: 'Fuga de agua',
+        descripcion: 'Hay una tubería rota en la vereda.',
+        latitud: -12.12,
+        longitud: -77.03,
+      );
+      client.close();
+
+      expect(suggestion.sugerida, isTrue);
+      expect(suggestion.entidad?.id, 'sedapal-lima-callao');
+      expect(suggestion.entidad?.tipo, 'empresa_saneamiento');
+    });
+
     test('AiCategorySuggestion acepta la respuesta vigente del backend', () {
       final suggestion = AiCategorySuggestion.fromJson({
         'sugerida': true,
