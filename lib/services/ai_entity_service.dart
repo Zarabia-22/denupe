@@ -69,7 +69,9 @@ class AiEntitySuggestion {
 
 /// Cliente del endpoint HU-IA02 del backend FastAPI.
 class AiEntityService {
-  AiEntityService({http.Client? client}) : _httpClient = client ?? http.Client();
+  static final http.Client _sharedClient = http.Client();
+
+  AiEntityService({http.Client? client}) : _httpClient = client ?? _sharedClient;
 
   final http.Client _httpClient;
 
