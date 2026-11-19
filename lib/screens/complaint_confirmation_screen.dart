@@ -108,7 +108,22 @@ class _ComplaintConfirmationScreenState
         return 'serenazgo';
       case 'autoridad_transporte_urbano':
       case 'empresa_concesionaria_electrica':
+      case 'empresa_saneamiento':
+      case 'revision_competencia':
         return 'otro';
+      default:
+        return null;
+    }
+  }
+
+  String? _authoritySiglaForEntity(String entityType) {
+    switch (entityType) {
+      case 'autoridad_transporte_urbano':
+      case 'empresa_concesionaria_electrica':
+      case 'empresa_saneamiento':
+        return 'ESP';
+      case 'revision_competencia':
+        return 'REV';
       default:
         return null;
     }
@@ -116,9 +131,12 @@ class _ComplaintConfirmationScreenState
 
   void _selectPublicEntity(AiPublicEntity entity) {
     final authorityType = _authorityTypeForEntity(entity.tipo);
+    final authoritySigla = _authoritySiglaForEntity(entity.tipo);
     Authority? authority;
     for (final item in _autoridades) {
-      if (item.tipo == authorityType && item.isActive) {
+      if (item.tipo == authorityType &&
+          item.isActive &&
+          (authoritySigla == null || item.sigla == authoritySigla)) {
         authority = item;
         break;
       }
@@ -397,12 +415,16 @@ class _ComplaintConfirmationScreenState
     final entity = suggestion.entidad;
     final authorityType =
         entity == null ? null : _authorityTypeForEntity(entity.tipo);
+    final authoritySigla =
+        entity == null ? null : _authoritySiglaForEntity(entity.tipo);
     final canApply = suggestion.sugerida &&
         entity != null &&
         authorityType != null &&
         _autoridades.any(
           (authority) =>
-              authority.tipo == authorityType && authority.isActive,
+              authority.tipo == authorityType &&
+              authority.isActive &&
+              (authoritySigla == null || authority.sigla == authoritySigla),
         );
     final isApplied = _selectedPublicEntity?.id == entity?.id;
     return Container(
