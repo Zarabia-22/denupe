@@ -138,7 +138,9 @@ class _ComplaintConfirmationScreenState
     if (_availableEntities.length == 1) {
       final entity = _availableEntities.single;
       _selectPublicEntity(entity);
-      _showMessage('DenuPe seleccionó la única institución con competencia verificada: ${entity.nombre}.');
+      if (_selectedPublicEntity?.id == entity.id) {
+        _showMessage('DenuPe seleccionó la única institución con competencia verificada: ${entity.nombre}.');
+      }
       return;
     }
     setState(() {
