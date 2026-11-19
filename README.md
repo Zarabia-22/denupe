@@ -64,7 +64,7 @@ Edita `.env` y configura valores reales:
 - `INSFORGE_ANON_KEY`: clave pública/anon del proyecto.
 - `DENUPE_IA_URL`: URL base HTTPS del backend FastAPI de DenuPe, sin barra final (por ejemplo, el servicio de pruebas HU-IA02 indicado en la plantilla).
 
-No sustituyas las credenciales por valores ficticios ni publiques el archivo `.env`. Si `DENUPE_IA_URL` no está configurada, las funciones de IA mostrarán un mensaje y la selección manual seguirá disponible; la aplicación no apuntará silenciosamente a un servidor de pruebas.
+No sustituyas las credenciales por valores ficticios ni publiques el archivo `.env`. El catálogo de instituciones para la selección manual y las recomendaciones de IA comparten este servicio, por lo que `DENUPE_IA_URL` es necesaria para disponer de ambas funciones. Si el servicio no responde, la app informa del problema y permite reintentar el catálogo; la denuncia aún puede continuar con la asignación de respaldo configurada en InsForge. La app no apunta silenciosamente a un servidor de pruebas.
 
 ### 3. Instalar dependencias
 
@@ -109,7 +109,7 @@ La app consume estos endpoints del servicio FastAPI:
 - `POST /api/ia/sugerir-entidad`: recomendación de destino público o abstención hacia revisión de competencia.
 - `GET /health`: estado del servicio.
 
-La URL se configura exclusivamente mediante `DENUPE_IA_URL`. Si el servicio no responde, el ciudadano puede continuar con selección manual; una recomendación no se aplica sin su confirmación.
+La URL se configura exclusivamente mediante `DENUPE_IA_URL`. El catálogo manual y las recomendaciones dependen de este servicio; si no responde, la app muestra el error y permite reintentar. La asignación de respaldo de InsForge evita bloquear el envío de la denuncia. Una recomendación de IA nunca se aplica sin confirmación del ciudadano.
 
 **Cobertura territorial:** el catálogo de entidades descrito por el backend tiene cobertura inicial en Lima Metropolitana y Callao. La aplicación no debe asumir que una entidad está disponible para distritos o competencias que el backend no haya verificado.
 
