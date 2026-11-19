@@ -135,11 +135,22 @@ class _ComplaintConfirmationScreenState
   }
 
   void _useAutomaticAssignment() {
+    if (_availableEntities.length == 1) {
+      final entity = _availableEntities.single;
+      _selectPublicEntity(entity);
+      _showMessage('DenuPe seleccionó la única institución con competencia verificada: ${entity.nombre}.');
+      return;
+    }
     setState(() {
       _selectedPublicEntity = null;
       _selectedAuthorityId = null;
       _entitySuggestion = null;
     });
+    _showMessage(
+      _availableEntities.length > 1
+          ? 'Hay varias instituciones posibles. La denuncia pasará a revisión de competencia para evitar una asignación incorrecta.'
+          : 'No hay una institución única verificada. La denuncia pasará a revisión de competencia.',
+    );
   }
 
   Authority? get _selectedAuthority {
