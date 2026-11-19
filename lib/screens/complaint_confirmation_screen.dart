@@ -44,6 +44,7 @@ class _ComplaintConfirmationScreenState
   AiPublicEntity? _selectedPublicEntity;
   String _entitySearchQuery = '';
   bool _loadingEntities = false;
+  String? _entityCatalogError;
   String? _selectedAuthorityId;
   bool _confirming = false;
   bool _suggestingEntity = false;
@@ -73,10 +74,22 @@ class _ComplaintConfirmationScreenState
 
   Future<void> _loadManualEntities() async {
     final territory = _territoryForDistrict(widget.district);
-    if (territory == null) return;
+    if (territory == null) {
+      if (mounted) {
+        setState(() {
+          _availableEntities = [];
+          _entityCatalogError =
+              'El catálogo inicial de instituciones solo cubre Lima Metropolitana y Callao. Verifica el distrito de tu perfil.';
+        });
+      }
+      return;
+    }
     if (_autoridades.isEmpty) await _loadAutoridades();
     if (!mounted) return;
-    setState(() => _loadingEntities = true);
+    setState(() {
+      _loadingEntities = true;
+      _entityCatalogError = null;
+    });
     try {
       final entities = await AiEntityService().listarEntidadesDisponibles(
         categoria: _categoryName(),
@@ -87,10 +100,18 @@ class _ComplaintConfirmationScreenState
         longitud: widget.longitude,
       );
       if (!mounted) return;
-      setState(() => _availableEntities = entities);
+      setState(() {
+        _availableEntities = entities;
+        _entityCatalogError = null;
+      });
     } on AiEntityException catch (e) {
       if (!mounted) return;
+      setState(() => _entityCatalogError = e.message);
       _showMessage(e.message);
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _entityCatalogError =
+          'No se pudo consultar el catálogo. Comprueba la conexión y vuelve a intentarlo.');
     } finally {
       if (mounted) setState(() => _loadingEntities = false);
     }
@@ -664,11 +685,21 @@ class _ComplaintConfirmationScreenState
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
                 child: Text(
-                  _availableEntities.isEmpty
-                      ? 'No hay instituciones con competencia verificada para esta categoría y ubicación. Puedes dejar que DenuPe determine la asignación o consultar la recomendación de IA.'
-                      : 'No se encontraron instituciones con ese nombre.',
+                  _entityCatalogError ??
+                      (_availableEntities.isEmpty
+                          ? 'No hay instituciones con competencia verificada para esta categoría y ubicación. Puedes dejar que DenuPe determine la asignación o consultar la recomendación de IA.'
+                          : 'No se encontraron instituciones con ese nombre.'),
                   style: Theme.of(context).textTheme.bodySmall,
                 ),
+                if (_entityCatalogError != null)
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: _loadingEntities ? null : _loadManualEntities,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Reintentar catálogo'),
+                    ),
+                  ),
               )
             else
               ...filtered.map((entity) {
