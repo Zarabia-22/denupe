@@ -684,22 +684,28 @@ class _ComplaintConfirmationScreenState
             else if (filtered.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Text(
-                  _entityCatalogError ??
-                      (_availableEntities.isEmpty
-                          ? 'No hay instituciones con competencia verificada para esta categoría y ubicación. Puedes dejar que DenuPe determine la asignación o consultar la recomendación de IA.'
-                          : 'No se encontraron instituciones con ese nombre.'),
-                  style: Theme.of(context).textTheme.bodySmall,
-                ),
-                if (_entityCatalogError != null)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: _loadingEntities ? null : _loadManualEntities,
-                      icon: const Icon(Icons.refresh),
-                      label: const Text('Reintentar catálogo'),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _entityCatalogError ??
+                          (_availableEntities.isEmpty
+                              ? 'No hay instituciones con competencia verificada para esta categoría y ubicación. Puedes dejar que DenuPe determine la asignación o consultar la recomendación de IA.'
+                              : 'No se encontraron instituciones con ese nombre.'),
+                      style: Theme.of(context).textTheme.bodySmall,
                     ),
-                  ),
+                    if (_entityCatalogError != null)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          onPressed:
+                              _loadingEntities ? null : _loadManualEntities,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Reintentar catálogo'),
+                        ),
+                      ),
+                  ],
+                ),
               )
             else
               ...filtered.map((entity) {
