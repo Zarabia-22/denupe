@@ -40,6 +40,10 @@ class ComplaintConfirmationScreen extends StatefulWidget {
 class _ComplaintConfirmationScreenState
     extends State<ComplaintConfirmationScreen> {
   List<Authority> _autoridades = [];
+  List<AiPublicEntity> _availableEntities = [];
+  AiPublicEntity? _selectedPublicEntity;
+  String _entitySearchQuery = '';
+  bool _loadingEntities = false;
   String? _selectedAuthorityId;
   bool _confirming = false;
   bool _suggestingEntity = false;
@@ -49,6 +53,7 @@ class _ComplaintConfirmationScreenState
   void initState() {
     super.initState();
     _loadAutoridades();
+    _loadManualEntities();
   }
 
   Future<void> _loadAutoridades() async {
@@ -65,19 +70,74 @@ class _ComplaintConfirmationScreenState
     }
   }
 
+
+  Future<void> _loadManualEntities() async {
+    final territory = _territoryForDistrict(widget.district);
+    if (territory == null) return;
+    setState(() => _loadingEntities = true);
+    try {
+      final entities = await AiEntityService().listarEntidadesDisponibles(
+        categoria: _categoryName(),
+        departamento: territory['departamento']!,
+        provincia: territory['provincia']!,
+        distrito: widget.district!.trim(),
+        latitud: widget.latitude,
+        longitud: widget.longitude,
+      );
+      if (!mounted) return;
+      setState(() => _availableEntities = entities);
+    } on AiEntityException catch (e) {
+      if (!mounted) return;
+      _showMessage(e.message);
+    } finally {
+      if (mounted) setState(() => _loadingEntities = false);
+    }
+  }
+
   String? _authorityTypeForEntity(String entityType) {
     switch (entityType) {
       case 'municipalidad':
+      case 'municipalidad_distrital':
+      case 'municipalidad_provincial':
         return 'municipalidad';
       case 'comisaria_pnp':
         return 'comisaria';
       case 'serenazgo':
         return 'serenazgo';
+      case 'autoridad_transporte_urbano':
+      case 'empresa_concesionaria_electrica':
+        return 'otro';
       default:
-        // ATU y empresas eléctricas aún no existen como tipos de autoridad
-        // en el catálogo receptor local de InsForge.
         return null;
     }
+  }
+
+  void _selectPublicEntity(AiPublicEntity entity) {
+    final authorityType = _authorityTypeForEntity(entity.tipo);
+    Authority? authority;
+    for (final item in _autoridades) {
+      if (item.tipo == authorityType && item.isActive) {
+        authority = item;
+        break;
+      }
+    }
+    if (authority == null) {
+      _showMessage('La institución está identificada, pero falta habilitar su tipo receptor en DenuPe.');
+      return;
+    }
+    setState(() {
+      _selectedPublicEntity = entity;
+      _selectedAuthorityId = authority!.id;
+      _entitySuggestion = null;
+    });
+  }
+
+  void _useAutomaticAssignment() {
+    setState(() {
+      _selectedPublicEntity = null;
+      _selectedAuthorityId = null;
+      _entitySuggestion = null;
+    });
   }
 
   Authority? get _selectedAuthority {
@@ -200,35 +260,10 @@ class _ComplaintConfirmationScreenState
   void _applyEntitySuggestion() {
     final entity = _entitySuggestion?.entidad;
     if (entity == null) return;
-    final authorityType = _authorityTypeForEntity(entity.tipo);
-    if (authorityType == null) {
-      _showMessage(
-        'La entidad ${entity.nombre} está identificada, pero todavía no existe '
-        'un tipo receptor equivalente en DenuPe. No se asignará otra entidad en su lugar.',
-      );
-      return;
+    _selectPublicEntity(entity);
+    if (_selectedPublicEntity?.id == entity.id) {
+      _showMessage('Se seleccionó ${entity.nombre}.');
     }
-    Authority? authority;
-    for (final item in _autoridades) {
-      if (item.tipo == authorityType && item.isActive) {
-        authority = item;
-        break;
-      }
-    }
-    final selectedAuthority = authority;
-    if (selectedAuthority == null) {
-      _showMessage(
-        'La recomendación es ${entity.nombre}, pero no hay una entidad activa '
-        'de tipo ${authorityType.replaceAll('_', ' ')} en el catálogo de DenuPe.',
-      );
-      return;
-    }
-    setState(() => _selectedAuthorityId = selectedAuthority.id);
-    _showMessage(
-      'Se aceptó la recomendación. DenuPe registrará el tipo de entidad '
-      '${selectedAuthority.nombre}; el directorio local aún no guarda el identificador '
-      'individual de la institución recomendada.',
-    );
   }
 
   Future<void> _confirm() async {
@@ -246,6 +281,8 @@ class _ComplaintConfirmationScreenState
         // Si no, el trigger de InsForge aplica la autoridad predeterminada
         // configurada para la categoría.
         autoridadId: autoridad?.id,
+        entidadPublicaId: _selectedPublicEntity?.id,
+        entidadPublicaNombre: _selectedPublicEntity?.nombre,
       );
       bumpNotificationsTick();
       for (final item in widget.media) {
@@ -356,7 +393,7 @@ class _ComplaintConfirmationScreenState
           (authority) =>
               authority.tipo == authorityType && authority.isActive,
         );
-    final isApplied = _selectedAuthority != null;
+    final isApplied = _selectedPublicEntity?.id == entity?.id;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -404,7 +441,7 @@ class _ComplaintConfirmationScreenState
           const SizedBox(height: 6),
           Text(
             isApplied
-                ? 'Se aceptó la sugerencia. Por ahora DenuPe guarda el tipo general de entidad, no el identificador individual del organismo.'
+                ? 'Esta institución está seleccionada para la denuncia.'
                 : canApply
                     ? 'Esta es una sugerencia. Tú decides si usarla.'
                     : 'No existe un tipo receptor compatible en el catálogo actual de DenuPe. La recomendación es informativa y no se asignará otra entidad automáticamente.',
@@ -534,6 +571,14 @@ class _ComplaintConfirmationScreenState
   }
 
   Widget _buildEntityCard(Authority? autoridad) {
+    final query = _entitySearchQuery.trim().toLowerCase();
+    final filtered = _availableEntities.where((entity) {
+      if (query.isEmpty) return true;
+      return entity.nombre.toLowerCase().contains(query) ||
+          entity.tipo.replaceAll('_', ' ').toLowerCase().contains(query) ||
+          (entity.ambito['distrito'] ?? '').toLowerCase().contains(query);
+    }).toList();
+
     return Card(
       elevation: 0,
       margin: EdgeInsets.zero,
@@ -546,49 +591,112 @@ class _ComplaintConfirmationScreenState
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.account_balance_outlined,
-                  size: 20,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  'Asignación de entidad',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-              ],
-            ),
+            Row(children: [
+              Icon(Icons.account_balance_outlined, size: 20,
+                  color: Theme.of(context).colorScheme.primary),
+              const SizedBox(width: 8),
+              Text('Entidad responsable',
+                  style: Theme.of(context).textTheme.titleMedium),
+            ]),
             const SizedBox(height: 6),
             Text(
-              autoridad == null
-                  ? 'La entidad se determinará según la categoría y las reglas de asignación de DenuPe. Puedes consultar una recomendación de IA antes de confirmar.'
-                  : 'Se aceptó una sugerencia compatible. El registro local utilizará el tipo general de entidad.',
-              style: Theme.of(context)
-                  .textTheme
-                  .bodySmall
+              '1. Selecciona manualmente una institución disponible para la categoría y ubicación de tu denuncia.',
+              style: Theme.of(context).textTheme.bodySmall
                   ?.copyWith(color: Colors.grey.shade600),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
+            TextField(
+              onChanged: (value) => setState(() => _entitySearchQuery = value),
+              decoration: InputDecoration(
+                hintText: 'Buscar institución...',
+                prefixIcon: const Icon(Icons.search),
+                isDense: true,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (_loadingEntities)
+              const Padding(
+                padding: EdgeInsets.all(18),
+                child: Center(child: CircularProgressIndicator()),
+              )
+            else if (filtered.isEmpty)
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  _availableEntities.isEmpty
+                      ? 'No hay instituciones con competencia verificada para esta categoría y ubicación. Puedes dejar que DenuPe determine la asignación o consultar la recomendación de IA.'
+                      : 'No se encontraron instituciones con ese nombre.',
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              )
+            else
+              ...filtered.map((entity) {
+                final selected = _selectedPublicEntity?.id == entity.id;
+                final district = entity.ambito['distrito'] ?? widget.district ?? '';
+                final type = entity.tipo.replaceAll('_', ' ');
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 6),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: selected ? DenuPeColors.primary : Colors.grey.shade300,
+                      width: selected ? 1.5 : 1,
+                    ),
+                    color: selected ? DenuPeColors.primary.withValues(alpha: 0.06) : null,
+                  ),
+                  child: ListTile(
+                    dense: true,
+                    leading: Icon(
+                      selected ? Icons.radio_button_checked : Icons.radio_button_off,
+                      color: selected ? DenuPeColors.primary : Colors.grey,
+                    ),
+                    title: Text(entity.nombre, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text('$type · $district'),
+                    onTap: (_confirming || _suggestingEntity)
+                        ? null
+                        : () => _selectPublicEntity(entity),
+                  ),
+                );
+              }),
+            if (_selectedPublicEntity != null) ...[
+              const SizedBox(height: 4),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Icon(Icons.check_circle, color: DenuPeColors.accent, size: 18),
+                const SizedBox(width: 6),
+                Expanded(child: Text('Seleccionada: ${_selectedPublicEntity!.nombre}',
+                    style: const TextStyle(fontWeight: FontWeight.w600))),
+              ]),
+            ],
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: (_confirming || _suggestingEntity) ? null : _useAutomaticAssignment,
+                icon: const Icon(Icons.auto_fix_high_outlined),
+                label: const Text('No estoy seguro, que DenuPe decida'),
+              ),
+            ),
+            const Divider(height: 24),
+            Text('2. ¿Necesitas ayuda para elegir?',
+                style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 6),
+            Text(
+              'Puedes pedir a la inteligencia artificial que analice la denuncia y te sugiera una institución.',
+              style: Theme.of(context).textTheme.bodySmall
+                  ?.copyWith(color: Colors.grey.shade600),
+            ),
+            const SizedBox(height: 10),
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(
-                onPressed: (_suggestingEntity || _confirming)
-                    ? null
-                    : _suggestEntity,
+                onPressed: (_suggestingEntity || _confirming) ? null : _suggestEntity,
                 icon: _suggestingEntity
-                    ? const SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                    ? const SizedBox(width: 18, height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.auto_awesome_outlined),
-                label: Text(
-                  _suggestingEntity
-                      ? 'Analizando denuncia...'
-                      : 'Recomendar entidad con IA',
-                ),
+                label: Text(_suggestingEntity
+                    ? 'Analizando denuncia...'
+                    : 'Recomendar entidad con IA'),
                 style: OutlinedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   alignment: Alignment.center,
@@ -600,9 +708,9 @@ class _ComplaintConfirmationScreenState
               _buildEntitySuggestionCard(_entitySuggestion!),
             ],
             if (autoridad != null) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: 8),
               _SummaryRow(
-                label: 'Tipo receptor',
+                label: 'Tipo receptor interno',
                 detail: '${autoridad.nombre} (${autoridad.sigla})',
               ),
             ],
@@ -611,6 +719,7 @@ class _ComplaintConfirmationScreenState
       ),
     );
   }
+
 }
 
 class _SummaryRow extends StatelessWidget {
