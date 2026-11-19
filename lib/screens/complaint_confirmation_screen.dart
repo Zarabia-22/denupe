@@ -380,8 +380,8 @@ class _ComplaintConfirmationScreenState
         if (autoridad == null) ...[
           const SizedBox(height: 8),
           Text(
-            'Si no aceptas una sugerencia compatible, la entidad inicial se '
-            'determinará mediante la regla predeterminada de la categoría en DenuPe.',
+            'Si no seleccionas una institución y no existe una opción única validada, '
+            'DenuPe enviará la denuncia a revisión de competencia para evitar una asignación incorrecta.',
             textAlign: TextAlign.center,
             style: Theme.of(context)
                 .textTheme
