@@ -157,7 +157,11 @@ class _ComplaintConfirmationScreenState
       final entity = _availableEntities.single;
       _selectPublicEntity(entity);
       if (_selectedPublicEntity?.id == entity.id) {
-        _showMessage('DenuPe seleccionó la única institución con competencia verificada: ${entity.nombre}.');
+        _showMessage(
+          entity.tipo == 'revision_competencia'
+              ? 'La denuncia quedó dirigida a la bandeja interna de revisión de competencia.'
+              : 'DenuPe seleccionó la única institución con competencia verificada: ${entity.nombre}.',
+        );
       }
       return;
     }
@@ -427,6 +431,7 @@ class _ComplaintConfirmationScreenState
               (authoritySigla == null || authority.sigla == authoritySigla),
         );
     final isApplied = _selectedPublicEntity?.id == entity?.id;
+    final isReviewQueue = entity?.tipo == 'revision_competencia';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -446,7 +451,7 @@ class _ComplaintConfirmationScreenState
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Entidad sugerida por IA',
+                  'Destino sugerido por IA',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
@@ -473,11 +478,13 @@ class _ComplaintConfirmationScreenState
           Text(suggestion.motivo),
           const SizedBox(height: 6),
           Text(
-            isApplied
-                ? 'Esta institución está seleccionada para la denuncia.'
-                : canApply
-                    ? 'Esta es una sugerencia. Tú decides si usarla.'
-                    : 'No existe un tipo receptor compatible en el catálogo actual de DenuPe. La recomendación es informativa y no se asignará otra entidad automáticamente.',
+            isReviewQueue
+                ? 'Este es un destino interno de DenuPe, no una institución pública externa. El equipo revisará la competencia y determinará qué organismo debe recibir la denuncia.'
+                : isApplied
+                    ? 'Esta institución está seleccionada para la denuncia.'
+                    : canApply
+                        ? 'Esta es una sugerencia. Tú decides si usarla.'
+                        : 'No existe un tipo receptor compatible en el catálogo actual de DenuPe. La recomendación es informativa y no se asignará otra entidad automáticamente.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 12),
@@ -628,7 +635,7 @@ class _ComplaintConfirmationScreenState
               Icon(Icons.account_balance_outlined, size: 20,
                   color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 8),
-              Text('Entidad responsable',
+              Text('Destino de derivación',
                   style: Theme.of(context).textTheme.titleMedium),
             ]),
             const SizedBox(height: 6),
