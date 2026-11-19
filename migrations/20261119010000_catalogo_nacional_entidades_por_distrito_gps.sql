@@ -2113,7 +2113,7 @@ DECLARE
   v_longitude DOUBLE PRECISION;
   v_categoria_code TEXT;
 BEGIN
-  IF COALESCE(auth.role(), '') <> 'service_role' THEN
+  IF COALESCE(current_setting('request.jwt.claim.role', TRUE), (NULLIF(current_setting('request.jwt.claims', TRUE), '')::JSONB ->> 'role'), '') <> 'project_admin' THEN
     RAISE EXCEPTION 'Solo el backend confiable puede registrar la resolución geográfica';
   END IF;
 
