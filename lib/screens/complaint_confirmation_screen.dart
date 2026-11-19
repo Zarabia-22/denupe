@@ -146,6 +146,7 @@ class _ComplaintConfirmationScreenState
     setState(() {
       _suggestingEntity = true;
       _entitySuggestion = null;
+      _selectedAuthorityId = null;
     });
 
     // Mantiene el mismo diálogo de análisis utilizado por la sugerencia de categoría.
@@ -171,7 +172,7 @@ class _ComplaintConfirmationScreenState
     } on AiEntityException catch (e) {
       error = e.message;
     } catch (_) {
-      error = 'No se pudo obtener la recomendación. Puedes elegir el destino manualmente.';
+      error = 'No se pudo obtener la recomendación. La entidad se determinará con la regla predeterminada de la categoría.';
     } finally {
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
