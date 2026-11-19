@@ -143,13 +143,14 @@ class _ComplaintConfirmationScreenState
       );
       return;
     }
+    setState(() => _suggestingEntity = true);
     // Espera el catálogo local antes de decidir si la recomendación puede
     // convertirse en uno de los tipos receptores que DenuPe almacena.
     if (_autoridades.isEmpty) {
       await _loadAutoridades();
     }
+    if (!mounted) return;
     setState(() {
-      _suggestingEntity = true;
       _entitySuggestion = null;
       _selectedAuthorityId = null;
     });
@@ -214,17 +215,18 @@ class _ComplaintConfirmationScreenState
         break;
       }
     }
-    if (authority == null) {
+    final selectedAuthority = authority;
+    if (selectedAuthority == null) {
       _showMessage(
         'La recomendación es ${entity.nombre}, pero no hay una entidad activa '
         'de tipo ${authorityType.replaceAll('_', ' ')} en el catálogo de DenuPe.',
       );
       return;
     }
-    setState(() => _selectedAuthorityId = authority!.id);
+    setState(() => _selectedAuthorityId = selectedAuthority.id);
     _showMessage(
       'Se aceptó la recomendación. DenuPe registrará el tipo de entidad '
-      '${authority.nombre}; el directorio local aún no guarda el identificador '
+      '${selectedAuthority.nombre}; el directorio local aún no guarda el identificador '
       'individual de la institución recomendada.',
     );
   }
