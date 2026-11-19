@@ -144,6 +144,8 @@ class DenupeApi {
     double? latitude,
     double? longitude,
     String? autoridadId,
+    String? entidadPublicaId,
+    String? entidadPublicaNombre,
   }) async {
     final userId = _client.auth.currentUser!.id;
     final rows = await _client.database
@@ -157,6 +159,8 @@ class DenupeApi {
           'latitude': latitude,
           'longitude': longitude,
           'autoridad_id': autoridadId,
+          'entidad_publica_id': entidadPublicaId,
+          'entidad_publica_nombre': entidadPublicaNombre,
         })
         .select()
         .execute();
