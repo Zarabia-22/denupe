@@ -2075,7 +2075,7 @@ RETURNS TRIGGER
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
-AS $
+AS $$
 BEGIN
   IF COALESCE(current_setting('request.jwt.claim.role', TRUE), (NULLIF(current_setting('request.jwt.claims', TRUE), '')::JSONB ->> 'role'), '') <> 'project_admin' THEN
     NEW.autoridad_id := NULL;
@@ -2085,7 +2085,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 
 DROP TRIGGER IF EXISTS on_denuncia_limpiar_entidad_cliente ON public.denuncias;
 CREATE TRIGGER on_denuncia_limpiar_entidad_cliente
@@ -2107,7 +2107,7 @@ RETURNS VOID
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
-AS $
+AS $$
 DECLARE
   v_latitude DOUBLE PRECISION;
   v_longitude DOUBLE PRECISION;
@@ -2150,13 +2150,13 @@ BEGIN
       autoridad_id = NULL
   WHERE id = p_denuncia_id;
 END;
-$;
+$$;
 
 REVOKE ALL ON FUNCTION public.registrar_entidad_resuelta_por_gps(UUID,TEXT,TEXT,TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.registrar_entidad_resuelta_por_gps(UUID,TEXT,TEXT,TEXT) FROM anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.registrar_entidad_resuelta_por_gps(UUID,TEXT,TEXT,TEXT) TO project_admin;
 
-DO $
+DO $$
 BEGIN
   IF (SELECT COUNT(*) FROM public.distritos_peru) < 1893 THEN
     RAISE EXCEPTION 'El catálogo territorial quedó incompleto: se esperaban al menos 1,893 distritos';
@@ -2171,7 +2171,7 @@ BEGIN
     RAISE EXCEPTION 'Hay distritos sin las ocho relaciones de categoría';
   END IF;
 END;
-$;
+$$;
 
 
 -- Devuelve la matriz completa (ocho categorías) de un distrito ya resuelto por GPS.
@@ -2196,7 +2196,7 @@ LANGUAGE sql
 STABLE
 SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
-AS $
+AS $$
   SELECT d.ubigeo::TEXT, d.departamento, d.provincia, d.distrito,
          m.categoria_code, er.id, er.nombre, er.tipo,
          er.metodo_resolucion, m.requiere_gps, m.asignar_solo_tras_gps
@@ -2206,7 +2206,7 @@ AS $
   WHERE d.ubigeo = p_ubigeo
     AND er.activo = TRUE
   ORDER BY m.categoria_code;
-$;
+$$;
 REVOKE ALL ON FUNCTION public.consultar_matriz_distrital_por_ubigeo(TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.consultar_matriz_distrital_por_ubigeo(TEXT) TO anon, authenticated, project_admin;
 
