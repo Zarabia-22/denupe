@@ -108,7 +108,22 @@ class _ComplaintConfirmationScreenState
         return 'serenazgo';
       case 'autoridad_transporte_urbano':
       case 'empresa_concesionaria_electrica':
+      case 'empresa_saneamiento':
+      case 'revision_competencia':
         return 'otro';
+      default:
+        return null;
+    }
+  }
+
+  String? _authoritySiglaForEntity(String entityType) {
+    switch (entityType) {
+      case 'autoridad_transporte_urbano':
+      case 'empresa_concesionaria_electrica':
+      case 'empresa_saneamiento':
+        return 'ESP';
+      case 'revision_competencia':
+        return 'REV';
       default:
         return null;
     }
@@ -116,9 +131,12 @@ class _ComplaintConfirmationScreenState
 
   void _selectPublicEntity(AiPublicEntity entity) {
     final authorityType = _authorityTypeForEntity(entity.tipo);
+    final authoritySigla = _authoritySiglaForEntity(entity.tipo);
     Authority? authority;
     for (final item in _autoridades) {
-      if (item.tipo == authorityType && item.isActive) {
+      if (item.tipo == authorityType &&
+          item.isActive &&
+          (authoritySigla == null || item.sigla == authoritySigla)) {
         authority = item;
         break;
       }
@@ -139,7 +157,11 @@ class _ComplaintConfirmationScreenState
       final entity = _availableEntities.single;
       _selectPublicEntity(entity);
       if (_selectedPublicEntity?.id == entity.id) {
-        _showMessage('DenuPe seleccionó la única institución con competencia verificada: ${entity.nombre}.');
+        _showMessage(
+          entity.tipo == 'revision_competencia'
+              ? 'La denuncia quedó dirigida a la bandeja interna de revisión de competencia.'
+              : 'DenuPe seleccionó la única institución con competencia verificada: ${entity.nombre}.',
+        );
       }
       return;
     }
@@ -397,14 +419,19 @@ class _ComplaintConfirmationScreenState
     final entity = suggestion.entidad;
     final authorityType =
         entity == null ? null : _authorityTypeForEntity(entity.tipo);
+    final authoritySigla =
+        entity == null ? null : _authoritySiglaForEntity(entity.tipo);
     final canApply = suggestion.sugerida &&
         entity != null &&
         authorityType != null &&
         _autoridades.any(
           (authority) =>
-              authority.tipo == authorityType && authority.isActive,
+              authority.tipo == authorityType &&
+              authority.isActive &&
+              (authoritySigla == null || authority.sigla == authoritySigla),
         );
     final isApplied = _selectedPublicEntity?.id == entity?.id;
+    final isReviewQueue = entity?.tipo == 'revision_competencia';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
@@ -424,7 +451,7 @@ class _ComplaintConfirmationScreenState
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Entidad sugerida por IA',
+                  'Destino sugerido por IA',
                   style: TextStyle(fontWeight: FontWeight.w600),
                 ),
               ),
@@ -451,11 +478,13 @@ class _ComplaintConfirmationScreenState
           Text(suggestion.motivo),
           const SizedBox(height: 6),
           Text(
-            isApplied
-                ? 'Esta institución está seleccionada para la denuncia.'
-                : canApply
-                    ? 'Esta es una sugerencia. Tú decides si usarla.'
-                    : 'No existe un tipo receptor compatible en el catálogo actual de DenuPe. La recomendación es informativa y no se asignará otra entidad automáticamente.',
+            isReviewQueue
+                ? 'Este es un destino interno de DenuPe, no una institución pública externa. El equipo revisará la competencia y determinará qué organismo debe recibir la denuncia.'
+                : isApplied
+                    ? 'Esta institución está seleccionada para la denuncia.'
+                    : canApply
+                        ? 'Esta es una sugerencia. Tú decides si usarla.'
+                        : 'No existe un tipo receptor compatible en el catálogo actual de DenuPe. La recomendación es informativa y no se asignará otra entidad automáticamente.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 12),
@@ -606,7 +635,7 @@ class _ComplaintConfirmationScreenState
               Icon(Icons.account_balance_outlined, size: 20,
                   color: Theme.of(context).colorScheme.primary),
               const SizedBox(width: 8),
-              Text('Entidad responsable',
+              Text('Destino de derivación',
                   style: Theme.of(context).textTheme.titleMedium),
             ]),
             const SizedBox(height: 6),
