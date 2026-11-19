@@ -2019,7 +2019,7 @@ ALTER TABLE public.denuncias
 ALTER TABLE public.denuncias
   ADD CONSTRAINT denuncias_entidad_gps_requiere_ubicacion_check
   CHECK (
-    entidad_asignacion_origen IS DISTINCT FROM 'gps'
+    entidad_asignacion_origen IS NULL
     OR (latitude IS NOT NULL AND longitude IS NOT NULL AND distrito_ubigeo IS NOT NULL)
   );
 
@@ -2066,5 +2066,111 @@ AS $$
 $$;
 REVOKE ALL ON FUNCTION public.consultar_entidades_por_ubigeo(TEXT,TEXT) FROM PUBLIC;
 GRANT EXECUTE ON FUNCTION public.consultar_entidades_por_ubigeo(TEXT,TEXT) TO anon, authenticated;
+
+
+-- Los clientes no pueden enviar una asignación de entidad/distrito al crear
+-- la denuncia. El backend confiable escribe estos campos después de validar GPS.
+CREATE OR REPLACE FUNCTION public.limpiar_asignacion_entidad_cliente()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $
+BEGIN
+  IF COALESCE(auth.role(), '') <> 'service_role' THEN
+    NEW.autoridad_id := NULL;
+    NEW.entidad_publica_id := NULL;
+    NEW.distrito_ubigeo := NULL;
+    NEW.entidad_asignacion_origen := NULL;
+  END IF;
+  RETURN NEW;
+END;
+$;
+
+DROP TRIGGER IF EXISTS on_denuncia_limpiar_entidad_cliente ON public.denuncias;
+CREATE TRIGGER on_denuncia_limpiar_entidad_cliente
+BEFORE INSERT OR UPDATE OF autoridad_id, entidad_publica_id, distrito_ubigeo, entidad_asignacion_origen
+ON public.denuncias
+FOR EACH ROW
+EXECUTE FUNCTION public.limpiar_asignacion_entidad_cliente();
+
+-- El backend llama esta RPC únicamente después de resolver el punto GPS contra
+-- el polígono distrital oficial y obtener el UBIGEO. La función verifica que
+-- exista la relación UBIGEO-categoría-resolutor antes de guardar la asignación.
+CREATE OR REPLACE FUNCTION public.registrar_entidad_resuelta_por_gps(
+  p_denuncia_id UUID,
+  p_ubigeo TEXT,
+  p_resolutor_id TEXT,
+  p_entidad_publica_id TEXT
+)
+RETURNS VOID
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = pg_catalog, public, pg_temp
+AS $
+DECLARE
+  v_latitude DOUBLE PRECISION;
+  v_longitude DOUBLE PRECISION;
+  v_categoria_code TEXT;
+BEGIN
+  IF COALESCE(auth.role(), '') <> 'service_role' THEN
+    RAISE EXCEPTION 'Solo el backend confiable puede registrar la resolución geográfica';
+  END IF;
+
+  SELECT d.latitude, d.longitude, c.code
+    INTO v_latitude, v_longitude, v_categoria_code
+  FROM public.denuncias d
+  JOIN public.categorias c ON c.id = d.category_id
+  WHERE d.id = p_denuncia_id
+  FOR UPDATE OF d;
+
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Denuncia no encontrada o sin categoría válida';
+  END IF;
+  IF v_latitude IS NULL OR v_longitude IS NULL THEN
+    RAISE EXCEPTION 'La denuncia no tiene coordenadas GPS';
+  END IF;
+  IF NOT EXISTS (
+    SELECT 1
+    FROM public.distritos_peru dp
+    JOIN public.distrito_categoria_entidad dce ON dce.ubigeo = dp.ubigeo
+    WHERE dp.ubigeo = p_ubigeo
+      AND dce.categoria_code = v_categoria_code
+      AND dce.entidad_resolucion_id = p_resolutor_id
+      AND dce.requiere_gps = TRUE
+      AND dce.asignar_solo_tras_gps = TRUE
+  ) THEN
+    RAISE EXCEPTION 'No existe una relación habilitada para el UBIGEO, categoría y resolutor indicados';
+  END IF;
+
+  UPDATE public.denuncias
+  SET distrito_ubigeo = p_ubigeo,
+      entidad_publica_id = NULLIF(BTRIM(p_entidad_publica_id), ''),
+      entidad_asignacion_origen = 'gps',
+      autoridad_id = NULL
+  WHERE id = p_denuncia_id;
+END;
+$;
+
+REVOKE ALL ON FUNCTION public.registrar_entidad_resuelta_por_gps(UUID,TEXT,TEXT,TEXT) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.registrar_entidad_resuelta_por_gps(UUID,TEXT,TEXT,TEXT) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.registrar_entidad_resuelta_por_gps(UUID,TEXT,TEXT,TEXT) TO service_role;
+
+DO $
+BEGIN
+  IF (SELECT COUNT(*) FROM public.distritos_peru) < 1893 THEN
+    RAISE EXCEPTION 'El catálogo territorial quedó incompleto: se esperaban al menos 1,893 distritos';
+  END IF;
+  IF EXISTS (
+    SELECT d.ubigeo
+    FROM public.distritos_peru d
+    LEFT JOIN public.distrito_categoria_entidad m ON m.ubigeo = d.ubigeo
+    GROUP BY d.ubigeo
+    HAVING COUNT(DISTINCT m.categoria_code) <> 8
+  ) THEN
+    RAISE EXCEPTION 'Hay distritos sin las ocho relaciones de categoría';
+  END IF;
+END;
+$;
 
 COMMIT;
