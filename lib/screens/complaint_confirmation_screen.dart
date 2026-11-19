@@ -74,6 +74,8 @@ class _ComplaintConfirmationScreenState
   Future<void> _loadManualEntities() async {
     final territory = _territoryForDistrict(widget.district);
     if (territory == null) return;
+    if (_autoridades.isEmpty) await _loadAutoridades();
+    if (!mounted) return;
     setState(() => _loadingEntities = true);
     try {
       final entities = await AiEntityService().listarEntidadesDisponibles(
@@ -210,11 +212,7 @@ class _ComplaintConfirmationScreenState
       await _loadAutoridades();
     }
     if (!mounted) return;
-    setState(() {
-      _entitySuggestion = null;
-      _selectedAuthorityId = null;
-      _selectedPublicEntity = null;
-    });
+    setState(() => _entitySuggestion = null);
 
     // Mantiene el mismo diálogo de análisis utilizado por la sugerencia de categoría.
     showDialog<void>(
@@ -711,7 +709,7 @@ class _ComplaintConfirmationScreenState
             if (autoridad != null) ...[
               const SizedBox(height: 8),
               _SummaryRow(
-                label: 'Tipo receptor interno',
+                label: 'Canal de gestión',
                 detail: '${autoridad.nombre} (${autoridad.sigla})',
               ),
             ],
