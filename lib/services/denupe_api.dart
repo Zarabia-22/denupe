@@ -102,7 +102,7 @@ class DenupeApi {
     final rows = await _client.database
         .from('denuncias')
         .select(
-            'id,user_id,category_id,autoridad_id,title,description,address,latitude,longitude,status,priority,created_at,updated_at,denunciante_nombre,denunciante_dni,denunciante_email,denunciante_telefono')
+            'id,user_id,category_id,autoridad_id,entidad_publica_id,entidad_publica_nombre,title,description,address,latitude,longitude,status,priority,created_at,updated_at,denunciante_nombre,denunciante_dni,denunciante_email,denunciante_telefono')
         .eq('autoridad_id', autoridadId)
         .order('created_at', ascending: false)
         .execute();
@@ -130,7 +130,7 @@ class DenupeApi {
     final rows = await _client.database
         .from('denuncias')
         .select(
-            'id,user_id,category_id,autoridad_id,title,description,address,latitude,longitude,status,priority,created_at,updated_at,denunciante_nombre,denunciante_dni,denunciante_email,denunciante_telefono')
+            'id,user_id,category_id,autoridad_id,entidad_publica_id,entidad_publica_nombre,title,description,address,latitude,longitude,status,priority,created_at,updated_at,denunciante_nombre,denunciante_dni,denunciante_email,denunciante_telefono')
         .order('created_at', ascending: false)
         .execute();
     return rows.map(Complaint.fromJson).toList();
@@ -144,6 +144,8 @@ class DenupeApi {
     double? latitude,
     double? longitude,
     String? autoridadId,
+    String? entidadPublicaId,
+    String? entidadPublicaNombre,
   }) async {
     final userId = _client.auth.currentUser!.id;
     final rows = await _client.database
@@ -157,6 +159,8 @@ class DenupeApi {
           'latitude': latitude,
           'longitude': longitude,
           'autoridad_id': autoridadId,
+          'entidad_publica_id': entidadPublicaId,
+          'entidad_publica_nombre': entidadPublicaNombre,
         })
         .select()
         .execute();
@@ -180,7 +184,7 @@ class DenupeApi {
     final rows = await _client.database
         .from('denuncias')
         .select(
-            'id,user_id,category_id,autoridad_id,title,description,address,latitude,longitude,status,priority,created_at,updated_at,denunciante_nombre,denunciante_dni,denunciante_email,denunciante_telefono')
+            'id,user_id,category_id,autoridad_id,entidad_publica_id,entidad_publica_nombre,title,description,address,latitude,longitude,status,priority,created_at,updated_at,denunciante_nombre,denunciante_dni,denunciante_email,denunciante_telefono')
         .eq('id', id)
         .execute();
     if (rows.isEmpty) return null;

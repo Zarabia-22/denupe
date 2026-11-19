@@ -104,6 +104,8 @@ class Complaint {
     required this.userId,
     this.categoryId,
     this.autoridadId,
+    this.entidadPublicaId,
+    this.entidadPublicaNombre,
     required this.title,
     required this.description,
     this.address,
@@ -123,6 +125,8 @@ class Complaint {
   final String userId;
   final String? categoryId;
   final String? autoridadId;
+  final String? entidadPublicaId;
+  final String? entidadPublicaNombre;
   final String title;
   final String description;
   final String? address;
@@ -151,6 +155,8 @@ class Complaint {
       userId: json['user_id'].toString(),
       categoryId: json['category_id']?.toString(),
       autoridadId: json['autoridad_id']?.toString(),
+      entidadPublicaId: json['entidad_publica_id']?.toString(),
+      entidadPublicaNombre: json['entidad_publica_nombre']?.toString(),
       title: _str(json, 'title'),
       description: _str(json, 'description'),
       address: json['address'] as String?,

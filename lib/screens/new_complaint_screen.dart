@@ -215,6 +215,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
           longitude: _longitude,
           media: List<ComplaintAttachment>.of(_media),
           categories: _cats,
+          district: _profile?.district,
         ),
       ),
     );
