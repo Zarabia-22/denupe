@@ -2065,7 +2065,7 @@ AS $$
     AND dce.asignar_solo_tras_gps = TRUE;
 $$;
 REVOKE ALL ON FUNCTION public.consultar_entidades_por_ubigeo(TEXT,TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.consultar_entidades_por_ubigeo(TEXT,TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.consultar_entidades_por_ubigeo(TEXT,TEXT) TO anon, authenticated, project_admin;
 
 
 -- Los clientes no pueden enviar una asignación de entidad/distrito al crear
@@ -2208,6 +2208,6 @@ AS $
   ORDER BY m.categoria_code;
 $;
 REVOKE ALL ON FUNCTION public.consultar_matriz_distrital_por_ubigeo(TEXT) FROM PUBLIC;
-GRANT EXECUTE ON FUNCTION public.consultar_matriz_distrital_por_ubigeo(TEXT) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.consultar_matriz_distrital_por_ubigeo(TEXT) TO anon, authenticated, project_admin;
 
 COMMIT;
