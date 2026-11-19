@@ -2077,7 +2077,7 @@ SECURITY DEFINER
 SET search_path = pg_catalog, public, pg_temp
 AS $
 BEGIN
-  IF COALESCE(auth.role(), '') <> 'service_role' THEN
+  IF COALESCE(current_setting('request.jwt.claim.role', TRUE), (NULLIF(current_setting('request.jwt.claims', TRUE), '')::JSONB ->> 'role'), '') <> 'project_admin' THEN
     NEW.autoridad_id := NULL;
     NEW.entidad_publica_id := NULL;
     NEW.distrito_ubigeo := NULL;
@@ -2154,7 +2154,7 @@ $;
 
 REVOKE ALL ON FUNCTION public.registrar_entidad_resuelta_por_gps(UUID,TEXT,TEXT,TEXT) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.registrar_entidad_resuelta_por_gps(UUID,TEXT,TEXT,TEXT) FROM anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.registrar_entidad_resuelta_por_gps(UUID,TEXT,TEXT,TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION public.registrar_entidad_resuelta_por_gps(UUID,TEXT,TEXT,TEXT) TO project_admin;
 
 DO $
 BEGIN
