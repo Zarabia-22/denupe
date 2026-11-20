@@ -73,13 +73,14 @@ class _ComplaintConfirmationScreenState
 
 
   Future<void> _loadManualEntities() async {
-    final territory = _territoryForDistrict(widget.district);
-    if (territory == null) {
+    // El backend resuelve UBIGEO y jurisdicción desde el GPS; el distrito
+    // guardado en el perfil no se usa como fuente de autoridad territorial.
+    if (widget.latitude == null || widget.longitude == null) {
       if (mounted) {
         setState(() {
           _availableEntities = [];
           _entityCatalogError =
-              'El catálogo inicial de instituciones solo cubre Lima Metropolitana y Callao. Verifica el distrito de tu perfil.';
+              'Captura la ubicación GPS para consultar las instituciones competentes.';
         });
       }
       return;
@@ -93,9 +94,6 @@ class _ComplaintConfirmationScreenState
     try {
       final entities = await AiEntityService().listarEntidadesDisponibles(
         categoria: _categoryName(),
-        departamento: territory['departamento']!,
-        provincia: territory['provincia']!,
-        distrito: widget.district!.trim(),
         latitud: widget.latitude,
         longitud: widget.longitude,
       );
@@ -214,63 +212,19 @@ class _ComplaintConfirmationScreenState
     return categoryNameFromCache(widget.categoryId);
   }
 
-  Map<String, String>? _territoryForDistrict(String? value) {
-    if (value == null || value.trim().isEmpty) return null;
-    String normalize(String text) => text.toLowerCase().trim()
-        .replaceAll(RegExp(r'[áàäâ]'), 'a')
-        .replaceAll(RegExp(r'[éèëê]'), 'e')
-        .replaceAll(RegExp(r'[íìïî]'), 'i')
-        .replaceAll(RegExp(r'[óòöô]'), 'o')
-        .replaceAll(RegExp(r'[úùüû]'), 'u')
-        .replaceAll('ñ', 'n')
-        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-        .trim();
-
-    final district = normalize(value);
-    const callaoDistricts = {
-      'callao', 'bellavista', 'carmen de la legua reynoso',
-      'la perla', 'la punta', 'mi peru', 'ventanilla',
-    };
-    const limaDistricts = {
-      'lima', 'ancon', 'ate', 'barranco', 'brena', 'carabayllo',
-      'chaclacayo', 'chorrillos', 'cieneguilla', 'comas', 'el agustino',
-      'independencia', 'jesus maria', 'la molina', 'la victoria', 'lince',
-      'los olivos', 'lurigancho', 'lurin', 'magdalena del mar', 'miraflores',
-      'pachacamac', 'pucusana', 'pueblo libre', 'puente piedra',
-      'punta hermosa', 'punta negra', 'rimac', 'san bartolo', 'san borja',
-      'san isidro', 'san juan de lurigancho', 'san juan de miraflores',
-      'san luis', 'san martin de porres', 'san miguel', 'santa anita',
-      'santa maria del mar', 'santa rosa', 'santiago de surco', 'surquillo',
-      'villa el salvador', 'villa maria del triunfo',
-    };
-    if (callaoDistricts.contains(district)) {
-      return {'departamento': 'Callao', 'provincia': 'Callao'};
-    }
-    if (limaDistricts.contains(district)) {
-      return {'departamento': 'Lima', 'provincia': 'Lima'};
-    }
-    return null;
-  }
-
   Future<void> _suggestEntity() async {
     if (_suggestingEntity || _confirming) return;
-    final territory = _territoryForDistrict(widget.district);
-    if (territory == null) {
-      _showMessage(
-        'Completa tu distrito en el perfil con un distrito de Lima Metropolitana o Callao para consultar la entidad competente.',
-      );
+    if (widget.latitude == null || widget.longitude == null) {
+      _showMessage('Captura la ubicación GPS para identificar el distrito y la institución competente.');
       return;
     }
     setState(() => _suggestingEntity = true);
-    // Espera el catálogo local antes de decidir si la recomendación puede
-    // convertirse en uno de los tipos receptores que DenuPe almacena.
     if (_autoridades.isEmpty) {
       await _loadAutoridades();
     }
     if (!mounted) return;
     setState(() => _entitySuggestion = null);
 
-    // Mantiene el mismo diálogo de análisis utilizado por la sugerencia de categoría.
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -282,9 +236,6 @@ class _ComplaintConfirmationScreenState
     try {
       suggestion = await AiEntityService().sugerirEntidad(
         categoria: _categoryName(),
-        departamento: territory['departamento']!,
-        provincia: territory['provincia']!,
-        distrito: widget.district!.trim(),
         titulo: widget.title,
         descripcion: widget.description,
         latitud: widget.latitude,
@@ -293,7 +244,7 @@ class _ComplaintConfirmationScreenState
     } on AiEntityException catch (e) {
       error = e.message;
     } catch (_) {
-      error = 'No se pudo obtener la recomendación. La entidad se determinará con la regla predeterminada de la categoría.';
+      error = 'No se pudo obtener la recomendación. Puedes continuar con la selección manual o revisión de competencia.';
     } finally {
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
