@@ -453,62 +453,151 @@ class _ComplaintConfirmationScreenState
         );
     final isApplied = _selectedPublicEntity?.id == entity?.id;
     final isReviewQueue = entity?.tipo == 'revision_competencia';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: DenuPeColors.primary.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(12),
+        color: DenuPeColors.surface,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(
-          color: DenuPeColors.primary.withValues(alpha: 0.35),
+          color: DenuPeColors.primary.withValues(alpha: 0.28),
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.auto_awesome_outlined, color: DenuPeColors.primary),
-              SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  'Destino sugerido por IA',
-                  style: TextStyle(fontWeight: FontWeight.w600),
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: DenuPeColors.primary.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: const Icon(
+                  Icons.auto_awesome_outlined,
+                  color: DenuPeColors.primary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Resultado de la recomendación',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    SizedBox(height: 2),
+                    Text(
+                      'Asistente de entidades DenuPe',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 9,
+                  vertical: 5,
+                ),
+                decoration: BoxDecoration(
+                  color: DenuPeColors.primary.withValues(alpha: 0.09),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Text(
+                  'IA',
+                  style: TextStyle(
+                    color: DenuPeColors.primary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 16),
           Text(
             entity?.nombre ?? 'Entidad no disponible',
-            style: Theme.of(context).textTheme.titleMedium,
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  color: DenuPeColors.text,
+                ),
           ),
           if (entity != null) ...[
-            const SizedBox(height: 4),
-            Text('Tipo: ' + entity.tipo.replaceAll('_', ' ')),
-            if (entity.ambito.isNotEmpty)
-              Text('Ámbito: ' + entity.ambito.values.join(' · ')),
-            if (entity.direccion != null && entity.direccion!.isNotEmpty)
-              Text('Dirección: ' + entity.direccion!),
+            const SizedBox(height: 7),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: [
+                _EntityInfoChip(
+                  icon: Icons.account_balance_outlined,
+                  label: entity.tipo.replaceAll('_', ' '),
+                ),
+                if (entity.ambito.isNotEmpty)
+                  _EntityInfoChip(
+                    icon: Icons.location_on_outlined,
+                    label: entity.ambito.values.join(' · '),
+                  ),
+              ],
+            ),
+            if (entity.direccion != null && entity.direccion!.isNotEmpty) ...[
+              const SizedBox(height: 10),
+              _EntityDetailLine(
+                icon: Icons.place_outlined,
+                value: entity.direccion!,
+              ),
+            ],
             if (entity.telefono != null && entity.telefono!.isNotEmpty)
-              Text('Teléfono: ' + entity.telefono!),
+              _EntityDetailLine(
+                icon: Icons.phone_outlined,
+                value: entity.telefono!,
+              ),
             if (entity.sitioWeb != null && entity.sitioWeb!.isNotEmpty)
-              Text('Web: ' + entity.sitioWeb!),
+              _EntityDetailLine(
+                icon: Icons.language_outlined,
+                value: entity.sitioWeb!,
+              ),
           ],
-          const SizedBox(height: 6),
-          Text(suggestion.motivo),
-          const SizedBox(height: 6),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: DenuPeColors.background,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '¿Por qué se recomienda?',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  suggestion.motivo,
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
           Text(
             isReviewQueue
                 ? 'Este es un destino interno de DenuPe, no una institución pública externa. El equipo revisará la competencia y determinará qué organismo debe recibir la denuncia.'
                 : isApplied
-                    ? 'Esta institución está seleccionada para la denuncia.'
+                    ? 'Esta institución está seleccionada para tu denuncia.'
                     : canApply
-                        ? 'Esta es una sugerencia. Tú decides si usarla.'
-                        : 'No existe un tipo receptor compatible en el catálogo actual de DenuPe. La recomendación es informativa y no se asignará otra entidad automáticamente.',
-            style: Theme.of(context).textTheme.bodySmall,
+                        ? 'Revisa la información. Tú decides si deseas utilizar esta institución.'
+                        : 'La recomendación es informativa porque no existe un tipo receptor compatible en el catálogo actual de DenuPe.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.grey.shade700,
+                ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -518,21 +607,20 @@ class _ComplaintConfirmationScreenState
                   onPressed: (_confirming || _suggestingEntity)
                       ? null
                       : _applyEntitySuggestion,
-                  icon: const Icon(Icons.check),
-                  label: const Text('Usar sugerencia'),
+                  icon: Icon(isApplied ? Icons.check_circle : Icons.check),
+                  label: Text(isApplied ? 'Sugerencia aplicada' : 'Usar sugerencia'),
                 ),
-              OutlinedButton(
+              OutlinedButton.icon(
                 onPressed: (_confirming || _suggestingEntity)
                     ? null
                     : _suggestEntity,
-                child: const Text('Volver a sugerir'),
+                icon: const Icon(Icons.refresh),
+                label: const Text('Volver a sugerir'),
               ),
               TextButton(
                 onPressed: (_confirming || _suggestingEntity)
                     ? null
                     : () => setState(() {
-                          // Ignorar solo descarta la recomendación de IA.
-                          // No debe borrar una selección manual previa.
                           _entitySuggestion = null;
                         }),
                 child: const Text('Ignorar'),
@@ -641,163 +729,340 @@ class _ComplaintConfirmationScreenState
           (entity.ambito['distrito'] ?? '').toLowerCase().contains(query);
     }).toList();
 
-    return Card(
-      elevation: 0,
-      margin: EdgeInsets.zero,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: Colors.grey.shade300),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(children: [
-              Icon(Icons.account_balance_outlined, size: 20,
-                  color: Theme.of(context).colorScheme.primary),
-              const SizedBox(width: 8),
-              Text('Destino de derivación',
-                  style: Theme.of(context).textTheme.titleMedium),
-            ]),
-            const SizedBox(height: 6),
-            Text(
-              '1. Selecciona manualmente una institución disponible para la categoría y ubicación de tu denuncia.',
-              style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              onChanged: (value) => setState(() => _entitySearchQuery = value),
-              decoration: InputDecoration(
-                hintText: 'Buscar institución...',
-                prefixIcon: const Icon(Icons.search),
-                isDense: true,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-            ),
-            const SizedBox(height: 8),
-            if (_loadingEntities)
-              const Padding(
-                padding: EdgeInsets.all(18),
-                child: Center(child: CircularProgressIndicator()),
-              )
-            else if (filtered.isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Card(
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(color: Colors.grey.shade300),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Text(
-                      _entityCatalogError ??
-                          (_availableEntities.isEmpty
-                              ? 'No hay instituciones con competencia verificada para esta categoría y ubicación. Puedes dejar que DenuPe determine la asignación o consultar la recomendación de IA.'
-                              : 'No se encontraron instituciones con ese nombre.'),
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    if (_entityCatalogError != null)
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: TextButton.icon(
-                          onPressed:
-                              _loadingEntities ? null : _loadManualEntities,
-                          icon: const Icon(Icons.refresh),
-                          label: const Text('Reintentar catálogo'),
-                        ),
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: DenuPeColors.primary.withValues(alpha: 0.08),
+                        borderRadius: BorderRadius.circular(10),
                       ),
+                      child: const Icon(
+                        Icons.account_balance_outlined,
+                        color: DenuPeColors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '1. Selecciona una institución',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Elige manualmente quién recibirá tu denuncia.',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
-              )
-            else
-              ...filtered.map((entity) {
-                final selected = _selectedPublicEntity?.id == entity.id;
-                final district = entity.ambito['distrito'] ?? widget.district ?? '';
-                final type = entity.tipo.replaceAll('_', ' ');
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 6),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                      color: selected ? DenuPeColors.primary : Colors.grey.shade300,
-                      width: selected ? 1.5 : 1,
+                const SizedBox(height: 16),
+                TextField(
+                  onChanged: (value) =>
+                      setState(() => _entitySearchQuery = value),
+                  decoration: InputDecoration(
+                    hintText: 'Buscar institución...',
+                    prefixIcon: const Icon(Icons.search),
+                    isDense: true,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    color: selected ? DenuPeColors.primary.withValues(alpha: 0.06) : null,
                   ),
-                  child: ListTile(
-                    dense: true,
-                    leading: Icon(
-                      selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                      color: selected ? DenuPeColors.primary : Colors.grey,
-                    ),
-                    title: Text(entity.nombre, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text('$type · $district'),
-                    onTap: (_confirming || _suggestingEntity)
-                        ? null
-                        : () => _selectPublicEntity(entity),
-                  ),
-                );
-              }),
-            if (_selectedPublicEntity != null) ...[
-              const SizedBox(height: 4),
-              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Icon(Icons.check_circle, color: DenuPeColors.success, size: 18),
-                const SizedBox(width: 6),
-                Expanded(child: Text('Seleccionada: ${_selectedPublicEntity!.nombre}',
-                    style: const TextStyle(fontWeight: FontWeight.w600))),
-              ]),
-            ],
-            Align(
-              alignment: Alignment.centerLeft,
-              child: TextButton.icon(
-                onPressed: (_confirming || _suggestingEntity) ? null : _useAutomaticAssignment,
-                icon: const Icon(Icons.auto_fix_high_outlined),
-                label: const Text('No estoy seguro, que DenuPe decida'),
-              ),
-            ),
-            const Divider(height: 24),
-            Text('2. ¿Necesitas ayuda para elegir?',
-                style: Theme.of(context).textTheme.titleSmall),
-            const SizedBox(height: 6),
-            Text(
-              'Puedes pedir a la inteligencia artificial que analice la denuncia y te sugiera una institución.',
-              style: Theme.of(context).textTheme.bodySmall
-                  ?.copyWith(color: Colors.grey.shade600),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: (_suggestingEntity || _confirming) ? null : _suggestEntity,
-                icon: _suggestingEntity
-                    ? const SizedBox(width: 18, height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2))
-                    : const Icon(Icons.auto_awesome_outlined),
-                label: Text(_suggestingEntity
-                    ? 'Analizando denuncia...'
-                    : 'Recomendar entidad con IA'),
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  alignment: Alignment.center,
                 ),
-              ),
+                const SizedBox(height: 10),
+                if (_loadingEntities)
+                  const Padding(
+                    padding: EdgeInsets.all(18),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                else if (filtered.isEmpty)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _entityCatalogError ??
+                              (_availableEntities.isEmpty
+                                  ? 'No hay instituciones con competencia verificada para esta categoría y ubicación. Puedes dejar que DenuPe determine la asignación o consultar la recomendación de IA.'
+                                  : 'No se encontraron instituciones con ese nombre.'),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        if (_entityCatalogError != null)
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: _loadingEntities
+                                  ? null
+                                  : _loadManualEntities,
+                              icon: const Icon(Icons.refresh),
+                              label: const Text('Reintentar catálogo'),
+                            ),
+                          ),
+                      ],
+                    ),
+                  )
+                else
+                  ...filtered.map((entity) {
+                    final selected = _selectedPublicEntity?.id == entity.id;
+                    final district =
+                        entity.ambito['distrito'] ?? widget.district ?? '';
+                    final type = entity.tipo.replaceAll('_', ' ');
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 7),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(11),
+                        border: Border.all(
+                          color: selected
+                              ? DenuPeColors.primary
+                              : Colors.grey.shade300,
+                          width: selected ? 1.5 : 1,
+                        ),
+                        color: selected
+                            ? DenuPeColors.primary.withValues(alpha: 0.06)
+                            : null,
+                      ),
+                      child: ListTile(
+                        dense: true,
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 2,
+                        ),
+                        leading: Icon(
+                          selected
+                              ? Icons.radio_button_checked
+                              : Icons.radio_button_off,
+                          color: selected
+                              ? DenuPeColors.primary
+                              : Colors.grey,
+                        ),
+                        title: Text(
+                          entity.nombre,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                        subtitle: Text('$type · $district'),
+                        onTap: (_confirming || _suggestingEntity)
+                            ? null
+                            : () => _selectPublicEntity(entity),
+                      ),
+                    );
+                  }),
+                if (_selectedPublicEntity != null) ...[
+                  const SizedBox(height: 5),
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: DenuPeColors.accent.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(9),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.check_circle_outline,
+                          color: DenuPeColors.accent,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 7),
+                        Expanded(
+                          child: Text(
+                            'Seleccionada: ${_selectedPublicEntity!.nombre}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w600,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    onPressed: (_confirming || _suggestingEntity)
+                        ? null
+                        : _useAutomaticAssignment,
+                    icon: const Icon(Icons.auto_fix_high_outlined),
+                    label: const Text('No estoy seguro, que DenuPe decida'),
+                  ),
+                ),
+                if (autoridad != null) ...[
+                  const Divider(height: 20),
+                  _SummaryRow(
+                    label: 'Canal de gestión',
+                    detail: '${autoridad.nombre} (${autoridad.sigla})',
+                  ),
+                ],
+              ],
             ),
-            if (_entitySuggestion != null) ...[
-              const SizedBox(height: 12),
-              _buildEntitySuggestionCard(_entitySuggestion!),
-            ],
-            if (autoridad != null) ...[
-              const SizedBox(height: 8),
-              _SummaryRow(
-                label: 'Canal de gestión',
-                detail: '${autoridad.nombre} (${autoridad.sigla})',
-              ),
-            ],
-          ],
+          ),
         ),
-      ),
+        const SizedBox(height: 12),
+        Card(
+          elevation: 0,
+          margin: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+            side: BorderSide(
+              color: DenuPeColors.primary.withValues(alpha: 0.22),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: DenuPeColors.primary.withValues(alpha: 0.10),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.auto_awesome_outlined,
+                        color: DenuPeColors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '2. ¿Necesitas ayuda para elegir?',
+                            style: Theme.of(context).textTheme.titleSmall
+                                ?.copyWith(fontWeight: FontWeight.w700),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'El asistente analiza la denuncia y su ubicación para sugerir una institución.',
+                            style: Theme.of(context).textTheme.bodySmall
+                                ?.copyWith(color: Colors.grey.shade600),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed:
+                        (_suggestingEntity || _confirming) ? null : _suggestEntity,
+                    icon: _suggestingEntity
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.auto_awesome_outlined),
+                    label: Text(
+                      _suggestingEntity
+                          ? 'Analizando denuncia...'
+                          : 'Recomendar entidad con IA',
+                    ),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: DenuPeColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                  ),
+                ),
+                if (_entitySuggestion != null) ...[
+                  const SizedBox(height: 14),
+                  _buildEntitySuggestionCard(_entitySuggestion!),
+                ],
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 
+}
+
+
+class _EntityInfoChip extends StatelessWidget {
+  const _EntityInfoChip({required this.icon, required this.label});
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: DenuPeColors.background,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: DenuPeColors.primary),
+          const SizedBox(width: 5),
+          Text(label, style: const TextStyle(fontSize: 11)),
+        ],
+      ),
+    );
+  }
+}
+
+class _EntityDetailLine extends StatelessWidget {
+  const _EntityDetailLine({required this.icon, required this.value});
+
+  final IconData icon;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 16, color: Colors.grey.shade600),
+          const SizedBox(width: 7),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 12))),
+        ],
+      ),
+    );
+  }
 }
 
 class _SummaryRow extends StatelessWidget {
