@@ -1,10 +1,10 @@
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 /// Configuración central de la app.
-/// Lee las credenciales desde `.env` (ver `.env.example`).
+/// Lee las credenciales y URLs desde `.env` (ver `.env.example`).
 abstract final class Config {
   static String get baseUrl {
-    final value = dotenv.env['INSFORGE_URL'];
+    final value = dotenv.env['INSFORGE_URL']?.trim();
     if (value == null || value.isEmpty) {
       throw StateError('INSFORGE_URL no definido en .env');
     }
@@ -12,19 +12,17 @@ abstract final class Config {
   }
 
   static String get anonKey {
-    final value = dotenv.env['INSFORGE_ANON_KEY'];
+    final value = dotenv.env['INSFORGE_ANON_KEY']?.trim();
     if (value == null || value.isEmpty) {
       throw StateError('INSFORGE_ANON_KEY no definido en .env');
     }
     return value;
   }
 
-  /// URL pública HTTPS de la API FastAPI; nulo si no se ha configurado.
+  /// URL del microservicio FastAPI. No usa un endpoint de pruebas por defecto:
+  /// cada entorno debe declarar explícitamente DENUPE_IA_URL.
   static String? get aiBaseUrl {
     final value = dotenv.env['DENUPE_IA_URL']?.trim();
-    // Servicio público de IA; .env permite usar un entorno alternativo.
-    return (value == null || value.isEmpty)
-        ? 'https://denupe-ia-backend.onrender.com'
-        : value;
+    return (value == null || value.isEmpty) ? null : value;
   }
 }

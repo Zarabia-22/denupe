@@ -1,194 +1,145 @@
 # DenuPe
 
-<p align="center">
-  <img src="assets/images/denupe_logo.png" alt="Logotipo de DenuPe" width="160">
-</p>
+Aplicación móvil de **denuncias ciudadanas** desarrollada con Flutter e InsForge. Permite registrar incidencias, adjuntar evidencias, seleccionar manualmente una institución competente y consultar una recomendación de IA como ayuda opcional.
 
-**DenuPe** es una aplicación móvil de **denuncias ciudadanas** que facilita el reporte y seguimiento de incidentes en la comunidad. Permite describir un problema, indicar su ubicación, adjuntar evidencias y consultar su estado. Incluye una función de **inteligencia artificial que sugiere categorías** a partir del título y la descripción.
+> **Versión del paquete:** 1.4.2 — Flutter / InsForge (Postgres BaaS) / FastAPI (servicio de IA).
 
-> **Versión actual:** 1.3.0 · **Aplicación:** Flutter · **Backend de datos:** InsForge (PostgreSQL) · **IA:** Python + FastAPI, desplegada en Render.  
-> **Estado:** prototipo académico / versión de pruebas. La app no sustituye los canales oficiales de emergencia ni garantiza la atención institucional de una denuncia.
-
-## Descargar e instalar
-
-**Android:** [Descargar DenuPe 1.3.0 (APK)](https://github.com/Zarabia-22/denupe/releases/download/v1.3.0/denupe-1.3.0.apk) · [Ver notas de la versión](https://github.com/Zarabia-22/denupe/releases/tag/v1.3.0).
-
-1. Descarga el APK desde la versión publicada en GitHub Releases.
-2. Abre el archivo en tu dispositivo Android.
-3. Si Android lo solicita, habilita la instalación desde esa fuente y confirma.
-4. Abre DenuPe, regístrate y verifica tu correo electrónico.
-
-La versión 1.3.0 incorpora sugerencias de categoría con IA, ajustes de interfaz y el icono de DenuPe. La APK es una **versión de prueba distribuida por GitHub**, no una publicación en una tienda de aplicaciones.
+---
 
 ## Funcionalidades
 
 ### Ciudadanos
-
-| Funcionalidad | Descripción |
-|---|---|
-| Registro y acceso | Registro con verificación de correo, inicio/cierre de sesión y conservación de la sesión cuando corresponde. |
-| Perfil | Consulta y edición de nombre, DNI, teléfono y distrito. Para enviar una denuncia se requiere el perfil completo. |
-| Nueva denuncia | Formulario con título, descripción, categoría, dirección y ubicación GPS opcional. |
-| Evidencias | Adjunta desde la galería hasta **5 fotografías o videos**; límite de **50 MB por archivo**. |
-| Sugerencia con IA | Analiza el **título y la descripción** para sugerir una categoría, sin seleccionarla definitivamente hasta que el ciudadano la acepte. |
-| Confirmación | Revisión de la información y elección de la entidad destinataria antes del envío definitivo. |
-| Mis denuncias | Listado, detalle e historial de estados de las denuncias registradas. |
-| Notificaciones | Avisos dentro de la aplicación sobre cambios de estado; pueden marcarse como leídos. |
-
-Los estados contemplados son: **Recibida**, **En revisión**, **En proceso**, **Resuelta**, **Rechazada** y **Archivada**.
+- Registro, verificación de correo, inicio de sesión y perfil editable.
+- Nueva denuncia con categoría, título, descripción, dirección, GPS y hasta 5 fotos o videos.
+- Selección manual de destinos públicos disponibles según categoría y territorio.
+- Recomendación opcional de categoría y entidad mediante IA; el ciudadano conserva la decisión final.
+- Si no existe una institución verificable, la denuncia puede dirigirse a la bandeja interna de revisión de competencia. Esta bandeja no se presenta como entidad pública.
+- Seguimiento de estados, historial, evidencias y notificaciones en tiempo real.
 
 ### Funcionarios
+- Panel de denuncias asignadas a la entidad receptora.
+- Consulta de información y evidencias de la denuncia.
+- Actualización del estado con una nota opcional.
 
-- Panel de denuncias asociadas a la entidad del funcionario.
-- Consulta del detalle de los reportes y de los datos de contacto permitidos.
-- Actualización del estado con una nota opcional para el historial.
+---
 
-> La selección de la entidad, el registro de una denuncia y su seguimiento pertenecen al backend de datos de DenuPe. **La IA solo propone la categoría**: no determina automáticamente la autoridad, la prioridad ni la resolución del caso.
+## Descarga e instalación
 
-## Inteligencia artificial: sugerencia de categorías
+Consulta los [GitHub Releases](https://github.com/Zarabia-22/denupe/releases) para obtener una versión publicada. La configuración del APK distribuido depende de las variables incorporadas durante su compilación.
 
-La IA permite que el ciudadano describa un incidente en lenguaje cotidiano y reciba una recomendación antes de seleccionar la categoría definitiva.
-
-**Categorías del prototipo:** `Alumbrado`, `Limpieza`, `Ruido` y `Seguridad`.
-
-**Flujo de funcionamiento:**
-
-1. El ciudadano introduce el **título** y la **descripción** de la denuncia.
-2. Pulsa **«Sugerir categoría con IA»**.
-3. Flutter envía ambos textos por HTTPS al servicio **FastAPI**.
-4. El servicio utiliza un vectorizador **TF-IDF** y un **árbol de decisión** entrenado para producir una recomendación.
-5. La aplicación comprueba si la categoría devuelta corresponde a una categoría disponible en DenuPe.
-6. El ciudadano **acepta la sugerencia o elige manualmente**. Si la IA falla, la información es insuficiente o no existe una correspondencia única, el formulario permite continuar manualmente.
-
-El modelo es una **prueba de concepto entrenada con 200 registros simulados**; obtuvo una exactitud del **83,33 %** en su conjunto de prueba sintético. Esa cifra **no representa una precisión validada con denuncias reales**.
-
-**Recursos del backend de IA:**
-
-- [Repositorio de Python + FastAPI](https://github.com/Zarabia-22/denupe-ia-backend)
-- [API pública y documentación Swagger](https://denupe-ia-backend.onrender.com/docs)
-- [Verificación de disponibilidad](https://denupe-ia-backend.onrender.com/health)
-
-**Endpoint de predicción:**
-
-```http
-POST https://denupe-ia-backend.onrender.com/api/ia/sugerir-categoria
-Content-Type: application/json
-```
-
-Cuerpo de ejemplo:
-
-```json
-{
-  "titulo": "Basura acumulada en mi calle",
-  "descripcion": "Hay bolsas de basura y residuos que no han sido recogidos durante varios dias"
-}
-```
-
-La respuesta incluye `sugerida`, `categoria`, `motivo` y datos informativos del modelo. Cuando `sugerida` es `false`, DenuPe mantiene la selección manual.
-
-> El servicio de IA alojado en el plan gratuito de Render puede tardar en responder después de un periodo de inactividad. El cliente Flutter tiene un tiempo de espera de 15 segundos y muestra una alternativa manual ante errores.
-
-## Arquitectura y tecnologías
-
-| Componente | Tecnología | Responsabilidad |
-|---|---|---|
-| Aplicación móvil | Flutter / Dart | Interfaz, navegación, formularios y consumo de servicios. |
-| Backend de datos | InsForge (PostgreSQL BaaS) | Autenticación, perfiles, denuncias, entidades, historial y notificaciones. |
-| Evidencias | InsForge Storage | Almacenamiento de fotografías y videos. |
-| Actualizaciones | InsForge y conexión en tiempo real | Reflejar cambios de las denuncias y notificaciones. |
-| Servicio de IA | Python, FastAPI, Scikit-learn | Clasificación de textos mediante TF-IDF y árbol de decisión. |
-| Despliegue de IA | Render + Docker | API HTTPS independiente de la aplicación. |
-| Repositorios | GitHub | Control de versiones y automatización de pruebas del servicio IA. |
-
-El proyecto está organizado en pantallas, servicios, modelos, componentes compartidos y temas visuales. El servicio de inteligencia artificial se mantiene **separado** del backend de datos.
-
-```text
-denupe/
-├── android/                 # Configuración Android
-├── ios/                     # Configuración iOS
-├── assets/                  # Recursos e imágenes
-├── lib/
-│   ├── main.dart            # Arranque e inicialización
-│   ├── app.dart             # Navegación raíz
-│   ├── config.dart          # Variables de entorno
-│   ├── models.dart          # Modelos de datos
-│   ├── screens/             # Registro, denuncias, perfil, panel, etc.
-│   ├── services/            # Acceso a InsForge y al servicio de IA
-│   ├── theme/               # Colores y estilos
-│   └── widgets/             # Componentes reutilizables
-├── migrations/              # Migraciones SQL de InsForge
-├── test/                    # Pruebas Flutter
-├── .env.example             # Plantilla de configuración
-└── pubspec.yaml             # Dependencias y versión
-```
+---
 
 ## Desarrollo local
 
 ### Requisitos
+- Flutter SDK compatible con Dart `^3.13.4`.
+- Git.
+- Visual Studio Code con las extensiones Flutter y Dart.
+- Android Studio/emulador o un dispositivo Android (opcional).
 
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) con una versión compatible con el `pubspec.yaml` del repositorio.
-- [Git](https://git-scm.com/).
-- Android Studio, un emulador Android o un teléfono con depuración USB habilitada.
-- Opcional: [Visual Studio Code](https://code.visualstudio.com/) y las extensiones Flutter y Dart.
-- Credenciales de acceso a un proyecto **InsForge** configurado con las migraciones y recursos que necesita DenuPe.
-
-### 1. Clonar el proyecto
+### 1. Clonar el repositorio
 
 ```bash
 git clone https://github.com/Zarabia-22/denupe.git
 cd denupe
 ```
 
-### 2. Configurar las variables de entorno
+### 2. Configurar variables de entorno
 
-Copia `.env.example` a `.env` y reemplaza los datos de InsForge con los de **tu proyecto**:
+El archivo `.env` está excluido de Git porque contiene credenciales. Créalo a partir de la plantilla:
 
-```env
-INSFORGE_URL=https://tu-proyecto.us-east.insforge.app
-INSFORGE_ANON_KEY=anon_xxxxxxxxxxxxxxxxxxxx
-DENUPE_IA_URL=https://denupe-ia-backend.onrender.com
+**Windows (PowerShell):**
+```powershell
+Copy-Item .env.example .env
 ```
 
-- `INSFORGE_URL` y `INSFORGE_ANON_KEY` son necesarios para iniciar la aplicación.
-- `DENUPE_IA_URL` permite utilizar otro servidor de IA; si está ausente, la aplicación usa la URL pública de Render.
-- Para probar FastAPI en un emulador Android, puedes sustituirla por `http://10.0.2.2:8000` **solo para desarrollo local**.
-- **No subas tu archivo `.env` al repositorio.** Las variables integradas en el cliente móvil no deben contener claves administrativas ni secretos privados; utiliza únicamente credenciales destinadas al cliente.
+**macOS / Linux:**
+```bash
+cp .env.example .env
+```
 
-### 3. Instalar dependencias y ejecutar
+Edita `.env` y configura valores reales:
+
+- `INSFORGE_URL`: URL del proyecto InsForge.
+- `INSFORGE_ANON_KEY`: clave pública/anon del proyecto.
+- `DENUPE_IA_URL`: URL base HTTPS del backend FastAPI de DenuPe, sin barra final (por ejemplo, el servicio de pruebas HU-IA02 indicado en la plantilla).
+
+No sustituyas las credenciales por valores ficticios ni publiques el archivo `.env`. El catálogo de instituciones para la selección manual y las recomendaciones de IA comparten este servicio, por lo que `DENUPE_IA_URL` es necesaria para disponer de ambas funciones. Si el servicio no responde, la app informa del problema y permite reintentar el catálogo; la denuncia aún puede continuar con la asignación de respaldo configurada en InsForge. La app no apunta silenciosamente a un servidor de pruebas.
+
+### 3. Instalar dependencias
 
 ```bash
-flutter doctor
 flutter pub get
-flutter devices
-flutter run
 ```
 
-Selecciona tu dispositivo si Flutter detecta más de uno. Para ejecutar pruebas del proyecto:
+### 4. Ejecutar la aplicación
 
 ```bash
-flutter test
+# Web
+flutter run -d chrome
+
+# Android
+flutter run -d android
 ```
 
-Para generar una APK local:
+### 5. Compilar Android
 
 ```bash
 flutter build apk --release
 ```
 
-**Aviso:** la configuración Android actual firma las compilaciones `release` con las claves de depuración. Antes de distribuir la aplicación por una tienda o como producto final debe configurarse la **firma de producción**.
+Para compilar la web:
 
-### 4. Desarrollar el servicio de IA por separado
+```bash
+flutter build web --release
+cd build/web
+python -m http.server 8080
+```
 
-El backend de IA no requiere ejecutar Flutter para probar sus predicciones. Revisa sus instrucciones en [denupe-ia-backend](https://github.com/Zarabia-22/denupe-ia-backend). Puede probarse mediante Swagger UI y mediante su endpoint `/health`.
+Abre http://localhost:8080.
 
-## Alcance actual y próximas mejoras
+---
 
-**Disponible en el código actual:** registro e inicio de sesión, perfiles, formulario de denuncias, ubicación, carga de evidencias, selección de entidad, historial, notificaciones dentro de la aplicación, panel de funcionarios y sugerencias de categoría con IA.
+## Integración con el backend de IA
 
-**Pendiente o fuera del alcance de esta versión:** pruebas completas de usabilidad y precisión del modelo con ciudadanos reales, autenticación y limitación de solicitudes en la API pública de IA, envío automático de denuncias sin conexión y notificaciones por SMS. Tampoco se ha implementado reconocimiento de imágenes para clasificar incidencias.
+La app consume estos endpoints del servicio FastAPI:
 
-## Contribuciones y soporte
+- `GET /api/entidades/disponibles`: catálogo elegible por categoría y territorio.
+- `POST /api/ia/sugerir-categoria`: sugerencia basada en título y descripción.
+- `POST /api/ia/sugerir-entidad`: recomendación de destino público o abstención hacia revisión de competencia.
+- `GET /health`: estado del servicio.
 
-Para comunicar errores o proponer mejoras, utiliza [GitHub Issues](https://github.com/Zarabia-22/denupe/issues).
+La URL se configura exclusivamente mediante `DENUPE_IA_URL`. El catálogo manual y las recomendaciones dependen de este servicio; si no responde, la app muestra el error y permite reintentar. La asignación de respaldo de InsForge evita bloquear el envío de la denuncia. Una recomendación de IA nunca se aplica sin confirmación del ciudadano.
 
-**Proyecto DenuPe — Plataforma de Denuncias Ciudadanas Accesibles.**
+**Cobertura territorial:** el catálogo de entidades descrito por el backend tiene cobertura inicial en Lima Metropolitana y Callao. La aplicación no debe asumir que una entidad está disponible para distritos o competencias que el backend no haya verificado.
+
+---
+
+## Soporte
+
+Reporta incidencias en [GitHub Issues](https://github.com/Zarabia-22/denupe/issues).
+## Catálogo nacional de entidades por distrito (asignación solo con GPS)
+
+La migración `20261119010000_catalogo_nacional_entidades_por_distrito_gps.sql` crea:
+- `distritos_peru`: catálogo territorial nacional por UBIGEO (1,893 registros de distrito en la versión de datos incorporada).
+- `entidades_resolucion`: resolutores sectoriales para municipalidad local, PNP, concesionaria eléctrica, EPS/operador de saneamiento, autoridad de tránsito, titular vial y ventanilla municipal.
+- `distrito_categoria_entidad`: matriz precargada de 8 categorías por distrito (15,144 relaciones para 1,893 distritos).
+
+La matriz es una **relación de enrutamiento**, no una asignación anticipada a una institución concreta. La institución real se resuelve después de obtener latitud/longitud, intersectar el punto con los límites distritales oficiales, obtener el UBIGEO y consultar la relación de su categoría. Para PNP, electricidad, saneamiento, transporte y vialidad también se valida la jurisdicción sectorial específica; el distrito por sí solo no reemplaza esos polígonos o ámbitos de prestación.
+
+La migración elimina la autoridad predeterminada global de las categorías y permite que `denuncias.autoridad_id` permanezca nulo al crear una denuncia. El trigger `limpiar_asignacion_entidad_cliente` evita que un cliente asigne una institución o UBIGEO directamente. El backend confiable registra la resolución mediante `registrar_entidad_resuelta_por_gps`, que exige coordenadas GPS en la denuncia y una relación UBIGEO-categoría-resolutor existente. La función presupone que el backend ya validó el punto contra el polígono geográfico; no sustituye esa comprobación espacial.
+
+### Mapeo de categorías
+
+| Código | Entidad/resolutor relacionado | Cómo se determina la institución final |
+|---|---|---|
+| `alumbrado` | Concesionaria eléctrica | GPS contra polígonos de concesión OSINERGMIN/MINEM |
+| `seguridad` | Comisaría PNP | GPS contra polígonos oficiales de jurisdicción PNP y validación de comisaría operativa |
+| `limpieza` | Municipalidad local | UBIGEO + directorio oficial de municipalidades |
+| `agua` | EPS/SEDAPAL/JASS u operador | GPS + ámbito oficial SUNASS y cobertura efectiva del predio |
+| `transito` | Autoridad de tránsito/transporte | GPS + tipo de incidente y competencia ATU/provincial/local/MTC |
+| `areas_verdes` | Municipalidad local | UBIGEO + validación de titularidad/administración del parque |
+| `infraestructura` | Titular/gestor del tramo vial | GPS + jerarquía, titularidad y concesión del tramo |
+| `otros` | Municipalidad como ventanilla inicial | UBIGEO + clasificación posterior de competencia |
+
+**Límite de datos:** el listado de UBIGEO se incorpora desde el conjunto `ubigeos_2026.csv` de [Rodasluis/Peru-maps](https://github.com/Rodasluis/Peru-maps), que declara derivación del SISCONCODE/INEI; el directorio de municipalidades vigente se debe contrastar con el [directorio INEI 2026](https://www.gob.pe/institucion/inei/informes-publicaciones/8058591). Los 1,893 registros territoriales no significan que existan 1,893 municipalidades distritales operativas ni que cada resolutor sectorial esté validado nominalmente para cada distrito. Los mapeos de PNP, concesionarias, EPS y titulares viales se resuelven contra sus fuentes oficiales en tiempo de asignación.

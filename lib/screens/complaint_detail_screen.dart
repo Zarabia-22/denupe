@@ -142,7 +142,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
           if (_media.isNotEmpty) ..._buildMediaSection(),
           const Divider(height: 32),
           _InfoRow(label: 'Categoría', detail: _categoryLabel(complaint.categoryId)),
-          _InfoRow(label: 'Entidad asignada', detail: _authorityLabel(complaint.autoridadId)),
+          _InfoRow(label: 'Entidad asignada', detail: complaint.entidadPublicaNombre ?? _authorityLabel(complaint.autoridadId)),
           if (complaint.address != null && complaint.address!.isNotEmpty)
             _InfoRow(label: 'Ubicación', detail: complaint.address!),
           if (complaint.latitude != null && complaint.longitude != null)

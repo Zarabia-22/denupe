@@ -179,7 +179,7 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
                                     return _ComplaintCard(
                                       complaint: item,
                                       categoryName: categoryNameOf(_cats, item.categoryId),
-                                      authorityName: authorityNameOf(_autoridades, item.autoridadId),
+                                      authorityName: item.entidadPublicaNombre ?? authorityNameOf(_autoridades, item.autoridadId),
                                       onTap: () => _openDetail(item),
                                     );
                                   },

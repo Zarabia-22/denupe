@@ -215,6 +215,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
           longitude: _longitude,
           media: List<ComplaintAttachment>.of(_media),
           categories: _cats,
+          district: _profile?.district,
         ),
       ),
     );
@@ -497,7 +498,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-
+              ..._buildContactSection(),
               TextFormField(
                 controller: _title,
                 focusNode: _titleFocus,
