@@ -78,9 +78,6 @@ class AiEntityService {
   /// Obtiene instituciones elegibles para que el ciudadano las seleccione manualmente.
   Future<List<AiPublicEntity>> listarEntidadesDisponibles({
     required String categoria,
-    required String departamento,
-    required String provincia,
-    required String distrito,
     double? latitud,
     double? longitud,
   }) async {
@@ -91,9 +88,6 @@ class AiEntityService {
     final base = Uri.parse('${baseUrl.replaceAll(RegExp(r"/+$"), "")}/api/entidades/disponibles');
     final uri = base.replace(queryParameters: {
       'categoria': categoria,
-      'departamento': departamento,
-      'provincia': provincia,
-      'distrito': distrito,
       if (latitud != null) 'latitud': latitud.toString(),
       if (longitud != null) 'longitud': longitud.toString(),
     });
@@ -121,9 +115,6 @@ class AiEntityService {
 
   Future<AiEntitySuggestion> sugerirEntidad({
     required String categoria,
-    required String departamento,
-    required String provincia,
-    required String distrito,
     required String titulo,
     required String descripcion,
     double? latitud,
@@ -143,9 +134,6 @@ class AiEntityService {
 
     final payload = <String, dynamic>{
       'categoria': categoria,
-      'departamento': departamento,
-      'provincia': provincia,
-      'distrito': distrito,
       'titulo': titulo.trim(),
       'descripcion': descripcion.trim(),
       if (latitud != null && longitud != null) ...{
