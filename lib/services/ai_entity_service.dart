@@ -14,6 +14,9 @@ class AiPublicEntity {
     this.direccion,
     this.telefono,
     this.sitioWeb,
+    this.entidadReferencia,
+    this.metodoResolucion,
+    this.categoriaCode,
   });
 
   final String id;
@@ -23,6 +26,9 @@ class AiPublicEntity {
   final String? telefono;
   final String? sitioWeb;
   final Map<String, String> ambito;
+  final String? entidadReferencia;
+  final String? metodoResolucion;
+  final String? categoriaCode;
 
   factory AiPublicEntity.fromJson(Map<String, dynamic> json) {
     final rawAmbito = json['ambito'];
@@ -40,6 +46,9 @@ class AiPublicEntity {
       telefono: json['telefono'] as String?,
       sitioWeb: json['sitio_web'] as String?,
       ambito: ambito,
+      entidadReferencia: json['entidad_referencia']?.toString(),
+      metodoResolucion: json['metodo_resolucion']?.toString(),
+      categoriaCode: json['categoria_code']?.toString(),
     );
   }
 }
@@ -110,6 +119,68 @@ class AiEntityService {
       rethrow;
     } catch (_) {
       throw const AiEntityException('No se pudo conectar con el catálogo de instituciones.');
+    }
+  }
+
+  /// Obtiene las ocho opciones de la matriz territorial para el distrito
+  /// resuelto por el backend a partir de las coordenadas GPS.
+  Future<List<AiPublicEntity>> listarCatalogoTerritorial({
+    required double latitud,
+    required double longitud,
+  }) async {
+    final baseUrl = Config.aiBaseUrl;
+    if (baseUrl == null || baseUrl.trim().isEmpty) {
+      throw const AiEntityException('Configura DENUPE_IA_URL para consultar el catálogo territorial.');
+    }
+    final base = Uri.parse('${baseUrl.replaceAll(RegExp(r"/+$"), "")}/api/territorio/catalogo-distrital');
+    final uri = base.replace(queryParameters: {
+      'latitud': latitud.toString(),
+      'longitud': longitud.toString(),
+    });
+    try {
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 40));
+      if (response.statusCode != 200) {
+        throw const AiEntityException('No se pudo cargar el catálogo territorial del distrito.');
+      }
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic> || decoded['categorias'] is! List) {
+        throw const FormatException('Respuesta inválida del catálogo territorial');
+      }
+      final territorio = <String, String>{
+        'departamento': decoded['departamento']?.toString() ?? '',
+        'provincia': decoded['provincia']?.toString() ?? '',
+        'distrito': decoded['distrito']?.toString() ?? '',
+      };
+      const nombres = {
+        'alumbrado': 'Alumbrado público',
+        'seguridad': 'Seguridad ciudadana',
+        'limpieza': 'Limpieza y residuos',
+        'agua': 'Agua y saneamiento',
+        'transito': 'Tránsito y transporte',
+        'areas_verdes': 'Parques y áreas verdes',
+        'infraestructura': 'Vialidad e infraestructura',
+        'otros': 'Otros',
+      };
+      return (decoded['categorias'] as List)
+          .whereType<Map<String, dynamic>>()
+          .map((item) => AiPublicEntity(
+                id: item['categoria_code']?.toString() ?? '',
+                nombre: nombres[item['categoria_code']?.toString()] ??
+                    item['categoria_code']?.toString() ?? 'Categoría',
+                tipo: item['entidad_tipo']?.toString() ?? '',
+                ambito: territorio,
+                entidadReferencia: item['entidad_nombre']?.toString(),
+                metodoResolucion: item['metodo_resolucion']?.toString(),
+                categoriaCode: item['categoria_code']?.toString(),
+              ))
+          .where((item) => item.id.isNotEmpty)
+          .toList();
+    } on TimeoutException {
+      throw const AiEntityException('El catálogo territorial está tardando demasiado en responder.');
+    } on AiEntityException {
+      rethrow;
+    } catch (_) {
+      throw const AiEntityException('No se pudo conectar con el catálogo territorial.');
     }
   }
 

@@ -42,6 +42,7 @@ class _ComplaintConfirmationScreenState
   List<Authority> _autoridades = [];
   List<AiPublicEntity> _availableEntities = [];
   AiPublicEntity? _selectedPublicEntity;
+  String? _selectedTerritorialCategoryCode;
   String _entitySearchQuery = '';
   bool _loadingEntities = false;
   String? _entityCatalogError;
@@ -90,7 +91,7 @@ class _ComplaintConfirmationScreenState
       _entityCatalogError = null;
     });
     try {
-      final entities = await AiEntityService().listarEntidadesDisponibles(
+      final entities = await AiEntityService().listarCatalogoTerritorial(
         latitud: widget.latitude!,
         longitud: widget.longitude!,
       );
@@ -146,24 +147,36 @@ class _ComplaintConfirmationScreenState
   }
 
   void _selectPublicEntity(AiPublicEntity entity) {
+    // Las opciones territoriales son rutas/categorías, no instituciones.
+    // Se guardan por separado para no enviar el código de categoría como ID
+    // de una entidad pública concreta.
+    if (entity.categoriaCode != null) {
+      setState(() {
+        _selectedTerritorialCategoryCode = entity.categoriaCode;
+        _selectedPublicEntity = null;
+        _selectedAuthorityId = null;
+        _entitySuggestion = null;
+      });
+      return;
+    }
+
     final authorityType = _authorityTypeForEntity(entity.tipo);
     final authoritySigla = _authoritySiglaForEntity(entity.tipo);
     Authority? authority;
-    for (final item in _autoridades) {
-      if (item.tipo == authorityType &&
-          item.isActive &&
-          (authoritySigla == null || item.sigla == authoritySigla)) {
-        authority = item;
-        break;
+    if (authorityType != null) {
+      for (final item in _autoridades) {
+        if (item.tipo == authorityType &&
+            item.isActive &&
+            (authoritySigla == null || item.sigla == authoritySigla)) {
+          authority = item;
+          break;
+        }
       }
-    }
-    if (authority == null) {
-      _showMessage('La institución está identificada, pero falta habilitar su tipo receptor en DenuPe.');
-      return;
     }
     setState(() {
       _selectedPublicEntity = entity;
-      _selectedAuthorityId = authority!.id;
+      _selectedTerritorialCategoryCode = null;
+      _selectedAuthorityId = authority?.id;
       _entitySuggestion = null;
     });
   }
@@ -308,6 +321,7 @@ class _ComplaintConfirmationScreenState
         autoridadId: autoridad?.id,
         entidadPublicaId: _selectedPublicEntity?.id,
         entidadPublicaNombre: _selectedPublicEntity?.nombre,
+        rutaTerritorialCode: _selectedTerritorialCategoryCode,
       );
       bumpNotificationsTick();
       for (final item in widget.media) {
@@ -691,11 +705,21 @@ class _ComplaintConfirmationScreenState
     );
   }
 
+  String _selectedTerritorialOptionName() {
+    for (final entity in _availableEntities) {
+      if (entity.categoriaCode == _selectedTerritorialCategoryCode) {
+        return entity.nombre;
+      }
+    }
+    return _selectedTerritorialCategoryCode ?? '';
+  }
+
   Widget _buildEntityCard(Authority? autoridad) {
     final query = _entitySearchQuery.trim().toLowerCase();
     final filtered = _availableEntities.where((entity) {
       if (query.isEmpty) return true;
       return entity.nombre.toLowerCase().contains(query) ||
+          (entity.entidadReferencia ?? '').toLowerCase().contains(query) ||
           entity.tipo.replaceAll('_', ' ').toLowerCase().contains(query) ||
           (entity.ambito['distrito'] ?? '').toLowerCase().contains(query);
     }).toList();
@@ -741,7 +765,9 @@ class _ComplaintConfirmationScreenState
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Revisa todas las instituciones registradas para el distrito detectado por GPS. La lista no se limita a la categoría de tu denuncia.',
+                            widget.district?.trim().isNotEmpty == true
+                                ? 'Revisa todas las instituciones registradas para el distrito ${widget.district!.trim()}, detectado mediante GPS.'
+                                : 'Revisa todas las instituciones registradas para el distrito detectado mediante GPS.',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: Colors.grey.shade600),
                           ),
@@ -778,7 +804,7 @@ class _ComplaintConfirmationScreenState
                         Text(
                           _entityCatalogError ??
                               (_availableEntities.isEmpty
-                                  ? 'No hay instituciones registradas para el distrito detectado. Comprueba tu ubicación GPS o vuelve a consultar el catálogo.'
+                                  ? 'El catálogo territorial no devolvió opciones para este distrito. Comprueba la ubicación GPS o vuelve a consultar.'
                                   : 'No se encontraron instituciones con ese nombre.'),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
@@ -798,10 +824,11 @@ class _ComplaintConfirmationScreenState
                   )
                 else
                   ...filtered.map((entity) {
-                    final selected = _selectedPublicEntity?.id == entity.id;
+                    final selected = entity.categoriaCode != null
+                        ? _selectedTerritorialCategoryCode == entity.categoriaCode
+                        : _selectedPublicEntity?.id == entity.id;
                     final district =
                         entity.ambito['distrito'] ?? widget.district ?? '';
-                    final type = entity.tipo.replaceAll('_', ' ');
                     return Container(
                       margin: const EdgeInsets.only(bottom: 7),
                       decoration: BoxDecoration(
@@ -834,14 +861,17 @@ class _ComplaintConfirmationScreenState
                           entity.nombre,
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
-                        subtitle: Text('$type · $district'),
+                        subtitle: Text([
+                          if ((entity.entidadReferencia ?? '').isNotEmpty) entity.entidadReferencia!,
+                          if (district.isNotEmpty) district,
+                        ].join(' · ')),
                         onTap: (_confirming || _suggestingEntity)
                             ? null
                             : () => _selectPublicEntity(entity),
                       ),
                     );
                   }),
-                if (_selectedPublicEntity != null) ...[
+                if (_selectedPublicEntity != null || _selectedTerritorialCategoryCode != null) ...[
                   const SizedBox(height: 5),
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -860,7 +890,7 @@ class _ComplaintConfirmationScreenState
                         const SizedBox(width: 7),
                         Expanded(
                           child: Text(
-                            'Seleccionada: ${_selectedPublicEntity!.nombre}',
+                            'Seleccionada: ${_selectedPublicEntity?.nombre ?? _selectedTerritorialOptionName()}',
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,

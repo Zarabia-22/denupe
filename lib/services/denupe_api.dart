@@ -146,6 +146,7 @@ class DenupeApi {
     String? autoridadId,
     String? entidadPublicaId,
     String? entidadPublicaNombre,
+    String? rutaTerritorialCode,
   }) async {
     final userId = _client.auth.currentUser!.id;
     final rows = await _client.database
@@ -161,6 +162,7 @@ class DenupeApi {
           'autoridad_id': autoridadId,
           'entidad_publica_id': entidadPublicaId,
           'entidad_publica_nombre': entidadPublicaNombre,
+          'ruta_territorial_code': rutaTerritorialCode,
         })
         .select()
         .execute();
