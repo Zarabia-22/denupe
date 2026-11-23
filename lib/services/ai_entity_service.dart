@@ -92,7 +92,7 @@ class AiEntityService {
       'longitud': longitud.toString(),
     });
     try {
-      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 20));
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 40));
       if (response.statusCode != 200) {
         throw const AiEntityException('No se pudo cargar el catálogo de instituciones del distrito.');
       }
