@@ -744,7 +744,9 @@ class _ComplaintConfirmationScreenState
                           ),
                           const SizedBox(height: 2),
                           Text(
-                             'Revisa todas las instituciones registradas para el distrito ${widget.district?.trim().isNotEmpty == true ? widget.district!.trim() : 'identificado'} detectado mediante GPS.',
+                            widget.district?.trim().isNotEmpty == true
+                                ? 'Revisa todas las instituciones registradas para el distrito ${widget.district!.trim()}, detectado mediante GPS.'
+                                : 'Revisa todas las instituciones registradas para el distrito detectado mediante GPS.',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: Colors.grey.shade600),
                           ),
