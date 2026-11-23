@@ -90,7 +90,7 @@ class _ComplaintConfirmationScreenState
       _entityCatalogError = null;
     });
     try {
-      final entities = await AiEntityService().listarEntidadesDisponibles(
+      final entities = await AiEntityService().listarCatalogoTerritorial(
         latitud: widget.latitude!,
         longitud: widget.longitude!,
       );
@@ -149,21 +149,23 @@ class _ComplaintConfirmationScreenState
     final authorityType = _authorityTypeForEntity(entity.tipo);
     final authoritySigla = _authoritySiglaForEntity(entity.tipo);
     Authority? authority;
-    for (final item in _autoridades) {
-      if (item.tipo == authorityType &&
-          item.isActive &&
-          (authoritySigla == null || item.sigla == authoritySigla)) {
-        authority = item;
-        break;
+    if (authorityType != null) {
+      for (final item in _autoridades) {
+        if (item.tipo == authorityType &&
+            item.isActive &&
+            (authoritySigla == null || item.sigla == authoritySigla)) {
+          authority = item;
+          break;
+        }
       }
     }
-    if (authority == null) {
-      _showMessage('La institución está identificada, pero falta habilitar su tipo receptor en DenuPe.');
-      return;
-    }
+    // La matriz territorial ofrece resolutores por categoría, no siempre
+    // una institución receptora concreta. Se permite guardar la elección
+    // manual sin inventar una autoridad receptora; la IA sigue disponible
+    // para intentar identificar una entidad específica.
     setState(() {
       _selectedPublicEntity = entity;
-      _selectedAuthorityId = authority!.id;
+      _selectedAuthorityId = authority?.id;
       _entitySuggestion = null;
     });
   }
@@ -696,6 +698,7 @@ class _ComplaintConfirmationScreenState
     final filtered = _availableEntities.where((entity) {
       if (query.isEmpty) return true;
       return entity.nombre.toLowerCase().contains(query) ||
+          (entity.entidadReferencia ?? '').toLowerCase().contains(query) ||
           entity.tipo.replaceAll('_', ' ').toLowerCase().contains(query) ||
           (entity.ambito['distrito'] ?? '').toLowerCase().contains(query);
     }).toList();
@@ -741,7 +744,7 @@ class _ComplaintConfirmationScreenState
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Revisa todas las instituciones registradas para el distrito detectado por GPS. La lista no se limita a la categoría de tu denuncia.',
+                            'Elige entre las 8 rutas de atención del catálogo territorial de tu distrito, identificado por GPS. Si no sabes cuál corresponde, puedes pedir ayuda a la IA.',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: Colors.grey.shade600),
                           ),
@@ -778,7 +781,7 @@ class _ComplaintConfirmationScreenState
                         Text(
                           _entityCatalogError ??
                               (_availableEntities.isEmpty
-                                  ? 'No hay instituciones registradas para el distrito detectado. Comprueba tu ubicación GPS o vuelve a consultar el catálogo.'
+                                  ? 'El catálogo territorial no devolvió opciones para este distrito. Comprueba la ubicación GPS o vuelve a consultar.'
                                   : 'No se encontraron instituciones con ese nombre.'),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
@@ -834,7 +837,10 @@ class _ComplaintConfirmationScreenState
                           entity.nombre,
                           style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
-                        subtitle: Text('$type · $district'),
+                        subtitle: Text([
+                          if ((entity.entidadReferencia ?? '').isNotEmpty) entity.entidadReferencia!,
+                          if (district.isNotEmpty) district,
+                        ].join(' · ')),
                         onTap: (_confirming || _suggestingEntity)
                             ? null
                             : () => _selectPublicEntity(entity),
