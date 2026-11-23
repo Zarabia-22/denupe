@@ -76,13 +76,11 @@ class AiEntityService {
   final http.Client _httpClient;
 
   /// Obtiene instituciones elegibles para que el ciudadano las seleccione manualmente.
+  /// Obtiene todas las instituciones registradas para el distrito resuelto por GPS.
+  /// No recibe categoría: el catálogo manual no se filtra por la denuncia.
   Future<List<AiPublicEntity>> listarEntidadesDisponibles({
-    required String categoria,
-    required String departamento,
-    required String provincia,
-    required String distrito,
-    double? latitud,
-    double? longitud,
+    required double latitud,
+    required double longitud,
   }) async {
     final baseUrl = Config.aiBaseUrl;
     if (baseUrl == null || baseUrl.trim().isEmpty) {
@@ -90,17 +88,13 @@ class AiEntityService {
     }
     final base = Uri.parse('${baseUrl.replaceAll(RegExp(r"/+$"), "")}/api/entidades/disponibles');
     final uri = base.replace(queryParameters: {
-      'categoria': categoria,
-      'departamento': departamento,
-      'provincia': provincia,
-      'distrito': distrito,
-      if (latitud != null) 'latitud': latitud.toString(),
-      if (longitud != null) 'longitud': longitud.toString(),
+      'latitud': latitud.toString(),
+      'longitud': longitud.toString(),
     });
     try {
-      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 15));
+      final response = await _httpClient.get(uri).timeout(const Duration(seconds: 40));
       if (response.statusCode != 200) {
-        throw const AiEntityException('No se pudo cargar el catálogo de instituciones.');
+        throw const AiEntityException('No se pudo cargar el catálogo de instituciones del distrito.');
       }
       final decoded = jsonDecode(response.body);
       if (decoded is! Map<String, dynamic> || decoded['entidades'] is! List) {

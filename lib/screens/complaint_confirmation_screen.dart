@@ -73,13 +73,12 @@ class _ComplaintConfirmationScreenState
 
 
   Future<void> _loadManualEntities() async {
-    final territory = _territoryForDistrict(widget.district);
-    if (territory == null) {
+    if (widget.latitude == null || widget.longitude == null) {
       if (mounted) {
         setState(() {
           _availableEntities = [];
           _entityCatalogError =
-              'El catálogo inicial de instituciones solo cubre Lima Metropolitana y Callao. Verifica el distrito de tu perfil.';
+              'Necesitamos la ubicación GPS de la denuncia para identificar el distrito y mostrar sus instituciones.';
         });
       }
       return;
@@ -92,12 +91,8 @@ class _ComplaintConfirmationScreenState
     });
     try {
       final entities = await AiEntityService().listarEntidadesDisponibles(
-        categoria: _categoryName(),
-        departamento: territory['departamento']!,
-        provincia: territory['provincia']!,
-        distrito: widget.district!.trim(),
-        latitud: widget.latitude,
-        longitud: widget.longitude,
+        latitud: widget.latitude!,
+        longitud: widget.longitude!,
       );
       if (!mounted) return;
       setState(() {
@@ -173,30 +168,6 @@ class _ComplaintConfirmationScreenState
     });
   }
 
-  void _useAutomaticAssignment() {
-    if (_availableEntities.length == 1) {
-      final entity = _availableEntities.single;
-      _selectPublicEntity(entity);
-      if (_selectedPublicEntity?.id == entity.id) {
-        _showMessage(
-          entity.tipo == 'revision_competencia'
-              ? 'La denuncia quedó dirigida a la bandeja interna de revisión de competencia.'
-              : 'DenuPe seleccionó la única institución con competencia verificada: ${entity.nombre}.',
-        );
-      }
-      return;
-    }
-    setState(() {
-      _selectedPublicEntity = null;
-      _selectedAuthorityId = null;
-      _entitySuggestion = null;
-    });
-    _showMessage(
-      _availableEntities.length > 1
-          ? 'Hay varias instituciones posibles. La denuncia pasará a revisión de competencia para evitar una asignación incorrecta.'
-          : 'No hay una institución única verificada. La denuncia pasará a revisión de competencia.',
-    );
-  }
 
   Authority? get _selectedAuthority {
     final id = _selectedAuthorityId;
@@ -764,13 +735,13 @@ class _ComplaintConfirmationScreenState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '1. Selecciona una institución',
+                            '1. Instituciones de tu distrito',
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Elige manualmente quién recibirá tu denuncia.',
+                            'Revisa todas las instituciones registradas para el distrito detectado por GPS. La lista no se limita a la categoría de tu denuncia.',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: Colors.grey.shade600),
                           ),
@@ -807,7 +778,7 @@ class _ComplaintConfirmationScreenState
                         Text(
                           _entityCatalogError ??
                               (_availableEntities.isEmpty
-                                  ? 'No hay instituciones con competencia verificada para esta categoría y ubicación. Puedes dejar que DenuPe determine la asignación o consultar la recomendación de IA.'
+                                  ? 'No hay instituciones registradas para el distrito detectado. Comprueba tu ubicación GPS o vuelve a consultar el catálogo.'
                                   : 'No se encontraron instituciones con ese nombre.'),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
@@ -900,16 +871,6 @@ class _ComplaintConfirmationScreenState
                     ),
                   ),
                 ],
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: (_confirming || _suggestingEntity)
-                        ? null
-                        : _useAutomaticAssignment,
-                    icon: const Icon(Icons.auto_fix_high_outlined),
-                    label: const Text('No estoy seguro, que DenuPe decida'),
-                  ),
-                ),
                 if (autoridad != null) ...[
                   const Divider(height: 20),
                   _SummaryRow(
@@ -962,7 +923,7 @@ class _ComplaintConfirmationScreenState
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'El asistente analiza la denuncia y su ubicación para sugerir una institución.',
+                            'La IA solo buscará una entidad específica cuando pulses «Sugerir entidad», usando la categoría, el contenido y la ubicación de la denuncia.',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: Colors.grey.shade600),
                           ),
@@ -990,7 +951,7 @@ class _ComplaintConfirmationScreenState
                     label: Text(
                       _suggestingEntity
                           ? 'Analizando denuncia...'
-                          : 'Recomendar entidad con IA',
+                          : 'Sugerir entidad',
                     ),
                     style: FilledButton.styleFrom(
                       backgroundColor: DenuPeColors.primary,
