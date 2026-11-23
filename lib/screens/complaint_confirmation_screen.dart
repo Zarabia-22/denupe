@@ -705,6 +705,15 @@ class _ComplaintConfirmationScreenState
     );
   }
 
+  String _selectedTerritorialOptionName() {
+    for (final entity in _availableEntities) {
+      if (entity.categoriaCode == _selectedTerritorialCategoryCode) {
+        return entity.nombre;
+      }
+    }
+    return _selectedTerritorialCategoryCode ?? '';
+  }
+
   Widget _buildEntityCard(Authority? autoridad) {
     final query = _entitySearchQuery.trim().toLowerCase();
     final filtered = _availableEntities.where((entity) {
@@ -882,7 +891,7 @@ class _ComplaintConfirmationScreenState
                         const SizedBox(width: 7),
                         Expanded(
                           child: Text(
-                            'Seleccionada: ${_selectedPublicEntity!.nombre}',
+                            'Seleccionada: ${_selectedPublicEntity?.nombre ?? _selectedTerritorialOptionName()}',
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
