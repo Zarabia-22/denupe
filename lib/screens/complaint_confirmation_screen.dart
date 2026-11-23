@@ -42,6 +42,7 @@ class _ComplaintConfirmationScreenState
   List<Authority> _autoridades = [];
   List<AiPublicEntity> _availableEntities = [];
   AiPublicEntity? _selectedPublicEntity;
+  String? _selectedTerritorialCategoryCode;
   String _entitySearchQuery = '';
   bool _loadingEntities = false;
   String? _entityCatalogError;
@@ -146,6 +147,19 @@ class _ComplaintConfirmationScreenState
   }
 
   void _selectPublicEntity(AiPublicEntity entity) {
+    // Las opciones territoriales son rutas/categorías, no instituciones.
+    // Se guardan por separado para no enviar el código de categoría como ID
+    // de una entidad pública concreta.
+    if (entity.categoriaCode != null) {
+      setState(() {
+        _selectedTerritorialCategoryCode = entity.categoriaCode;
+        _selectedPublicEntity = null;
+        _selectedAuthorityId = null;
+        _entitySuggestion = null;
+      });
+      return;
+    }
+
     final authorityType = _authorityTypeForEntity(entity.tipo);
     final authoritySigla = _authoritySiglaForEntity(entity.tipo);
     Authority? authority;
@@ -159,12 +173,9 @@ class _ComplaintConfirmationScreenState
         }
       }
     }
-    // La matriz territorial ofrece resolutores por categoría, no siempre
-    // una institución receptora concreta. Se permite guardar la elección
-    // manual sin inventar una autoridad receptora; la IA sigue disponible
-    // para intentar identificar una entidad específica.
     setState(() {
       _selectedPublicEntity = entity;
+      _selectedTerritorialCategoryCode = null;
       _selectedAuthorityId = authority?.id;
       _entitySuggestion = null;
     });
@@ -310,6 +321,7 @@ class _ComplaintConfirmationScreenState
         autoridadId: autoridad?.id,
         entidadPublicaId: _selectedPublicEntity?.id,
         entidadPublicaNombre: _selectedPublicEntity?.nombre,
+        rutaTerritorialCode: _selectedTerritorialCategoryCode,
       );
       bumpNotificationsTick();
       for (final item in widget.media) {
@@ -803,7 +815,9 @@ class _ComplaintConfirmationScreenState
                   )
                 else
                   ...filtered.map((entity) {
-                    final selected = _selectedPublicEntity?.id == entity.id;
+                    final selected = entity.categoriaCode != null
+                        ? _selectedTerritorialCategoryCode == entity.categoriaCode
+                        : _selectedPublicEntity?.id == entity.id;
                     final district =
                         entity.ambito['distrito'] ?? widget.district ?? '';
                     final type = entity.tipo.replaceAll('_', ' ');
@@ -849,7 +863,7 @@ class _ComplaintConfirmationScreenState
                       ),
                     );
                   }),
-                if (_selectedPublicEntity != null) ...[
+                if (_selectedPublicEntity != null || _selectedTerritorialCategoryCode != null) ...[
                   const SizedBox(height: 5),
                   Container(
                     padding: const EdgeInsets.all(10),
