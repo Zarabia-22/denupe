@@ -744,7 +744,7 @@ class _ComplaintConfirmationScreenState
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Elige entre las 8 rutas de atención del catálogo territorial de tu distrito, identificado por GPS. Si no sabes cuál corresponde, puedes pedir ayuda a la IA.',
+                             'Revisa todas las instituciones registradas para el distrito ${widget.district?.trim().isNotEmpty == true ? widget.district!.trim() : 'identificado'} detectado mediante GPS.',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: Colors.grey.shade600),
                           ),
