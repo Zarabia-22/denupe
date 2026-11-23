@@ -829,7 +829,6 @@ class _ComplaintConfirmationScreenState
                         : _selectedPublicEntity?.id == entity.id;
                     final district =
                         entity.ambito['distrito'] ?? widget.district ?? '';
-                    final type = entity.tipo.replaceAll('_', ' ');
                     return Container(
                       margin: const EdgeInsets.only(bottom: 7),
                       decoration: BoxDecoration(
