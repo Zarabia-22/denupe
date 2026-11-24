@@ -30,6 +30,35 @@ class DenupeApi {
   Future<void> signIn({required String email, required String password}) =>
       _client.auth.signIn(email: email, password: password);
 
+  Future<void> requestPasswordReset({required String email}) async {
+    final normalized = email.trim().toLowerCase();
+    await _client.database
+        .from('solicitudes_recuperacion')
+        .insert({'email': normalized})
+        .execute();
+    await _client.auth.sendPasswordReset(normalized);
+  }
+
+  Future<void> resendPasswordResetCode({required String email}) =>
+      _client.auth.sendPasswordReset(email.trim().toLowerCase());
+
+  Future<String> exchangePasswordResetCode({
+    required String email,
+    required String code,
+  }) async {
+    final result = await _client.auth.exchangeResetPasswordToken(
+      email: email.trim().toLowerCase(),
+      code: code.trim(),
+    );
+    return result.token;
+  }
+
+  Future<void> resetPassword({
+    required String token,
+    required String newPassword,
+  }) =>
+      _client.auth.resetPassword(otp: token, newPassword: newPassword);
+
   Future<void> signOut() => _client.auth.signOut();
 
   User? get currentUser => _client.auth.currentUser;
