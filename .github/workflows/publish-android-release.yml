@@ -78,7 +78,7 @@ jobs:
           body: |
             ## DenuPe 1.4.7 — PMV 2
 
-            Esta versión integra el catálogo territorial distrital con ocho opciones para selección manual y conserva la sugerencia de entidad mediante IA cuando el ciudadano necesita ayuda.
+            Esta versión mejora la presentación del selector territorial con tarjetas minimalistas. Las opciones muestran el organismo o canal de atención, el distrito y el estado de selección, sin exponer los nombres de las categorías.
 
             ### Novedades
             - Presenta las ocho opciones territoriales en tarjetas minimalistas, priorizando el nombre del organismo o canal de atención sobre el nombre de la categoría.
