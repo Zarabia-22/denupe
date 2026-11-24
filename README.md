@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Zarabia-22/denupe/releases"><img src="https://img.shields.io/badge/versi%C3%B3n-1.4.8%2B14-2457A7" alt="Versión 1.4.8+14" /></a>
+  <a href="https://github.com/Zarabia-22/denupe/releases"><img src="https://img.shields.io/badge/versi%C3%B3n-1.5.0%2B15-2457A7" alt="Versión 1.5.0+15" /></a>
   <img src="https://img.shields.io/badge/Flutter-Dart%20%5E3.13.4-02569B?logo=flutter&logoColor=white" alt="Flutter y Dart" />
   <img src="https://img.shields.io/badge/plataforma-Android%20%7C%20Web-0F766E" alt="Android y Web" />
   <a href="https://github.com/Zarabia-22/denupe/issues"><img src="https://img.shields.io/badge/soporte-GitHub%20Issues-orange" alt="Soporte en GitHub Issues" /></a>

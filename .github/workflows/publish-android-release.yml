@@ -1,15 +1,15 @@
-name: Publicar APK Android v1.4.8
+name: Publicar APK Android v1.5.0
 
 on:
   push:
     branches:
-      - release/v1.4.8
+      - release/v1.5.0
 
 permissions:
   contents: write
 
 concurrency:
-  group: denupe-release-v1.4.8
+  group: denupe-release-v1.5.0
   cancel-in-progress: false
 
 jobs:
@@ -62,42 +62,37 @@ jobs:
 
       - name: Preparar APK y checksum
         run: |
-          cp build/app/outputs/flutter-apk/app-release.apk denupe-1.4.8.apk
-          sha256sum denupe-1.4.8.apk > denupe-1.4.8.apk.sha256
+          cp build/app/outputs/flutter-apk/app-release.apk denupe-1.5.0.apk
+          sha256sum denupe-1.5.0.apk > denupe-1.5.0.apk.sha256
 
-      - name: Publicar GitHub Release v1.4.8
+      - name: Publicar GitHub Release v1.5.0
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.4.8
+          tag_name: v1.5.0
           target_commitish: ${{ github.sha }}
-          name: DenuPe 1.4.8 (PMV 2)
+          name: DenuPe 1.5.0 (PMV 2)
           draft: false
           prerelease: false
           make_latest: true
           generate_release_notes: false
           body: |
-            ## DenuPe 1.4.8 — PMV 2
+            ## DenuPe 1.5.0 — PMV 2
 
-            Esta versión mejora la presentación del selector territorial con tarjetas minimalistas y etiquetas vinculadas directamente al distrito. Cuando el catálogo no identifica una institución pública concreta, la interfaz muestra «Atención territorial en [distrito]» en lugar de expresiones genéricas.
+            Esta versión incorpora recuperación de contraseña por correo y deja lista la infraestructura para notificaciones por SMS, conservando el selector territorial y la recomendación de entidad de las versiones anteriores.
 
             ### Novedades
-            - Presenta las ocho opciones territoriales en tarjetas minimalistas, priorizando el nombre del organismo o canal de atención sobre el nombre de la categoría.
-            - Muestra el distrito como información secundaria y resalta visualmente la opción seleccionada.
-            - Sustituye etiquetas genéricas como «Entidad competente» o «Entidad por identificar» por «Atención territorial en [distrito]» cuando no existe un nombre institucional concreto verificado.
-            - Conserva los nombres reales de instituciones cuando el catálogo sí los proporciona.
-            - Guarda la ruta territorial elegida separada del identificador de una institución pública concreta.
-            - Mantiene la sugerencia de entidad mediante IA como alternativa cuando el ciudadano no tiene certeza sobre qué opción elegir.
-            - La recomendación de entidad mediante IA solo se solicita al pulsar **Sugerir entidad**.
-            - Mantiene la selección manual como decisión del ciudadano.
-            - El backend determina el distrito a partir de las coordenadas recibidas y evita confiar en el distrito enviado por el cliente.
-            - Se abstiene de inventar instituciones cuando no existe una entidad concreta verificable en las fuentes disponibles.
+            - Recuperación de contraseña por correo: código de verificación, reenvío y cambio de contraseña desde la pantalla de acceso.
+            - Registro de solicitudes de recuperación en InsForge para seguimiento posterior.
+            - Corrección de las plantillas de correo para usar la variable real `{{ token }}` en los códigos de verificación y reseteo.
+            - Infraestructura idempotente de SMS para notificaciones: cola de pendientes, reintentos, marcas de envío y normalización de teléfonos peruanos.
+            - Edge function `send-notification-sms` y schedule `sms-notificaciones` desplegados; el schedule permanece inactivo hasta configurar los secretos del proveedor.
 
             ### Alcance y limitaciones
-            El catálogo territorial ofrece rutas de atención por categoría; no todas representan una institución pública concreta verificada ni una cobertura institucional completa de todos los distritos del Perú. La migración `migrations/20261123010000_ruta_territorial_denuncia.sql` debe estar aplicada en InsForge para persistir la selección manual. La bandeja de revisión de competencia es interna de DenuPe y no es una entidad pública.
+            El envío de SMS requiere configurar `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` y `TWILIO_FROM_NUMBER` (o `TWILIO_MESSAGING_SERVICE_SID`), y activar el schedule. Los perfiles sin teléfono válido de 9 dígitos se omiten con `TELEFONO_INVALIDO`. Las migraciones `20261124000000_recovery-email-requests.sql` y `20261124020000_notificaciones-sms.sql` deben estar aplicadas en InsForge. La bandeja de revisión de competencia es interna de DenuPe y no es una entidad pública.
 
             ### Configuración del APK
             El APK se compila en modo release. La configuración Android actual utiliza la firma de depuración para este tipo de compilación, por lo que está destinado a instalación directa y pruebas; antes de distribuirlo mediante Google Play se debe configurar una clave de firma de producción.
           files: |
-            denupe-1.4.8.apk
-            denupe-1.4.8.apk.sha256
+            denupe-1.5.0.apk
+            denupe-1.5.0.apk.sha256
           fail_on_unmatched_files: true
