@@ -201,13 +201,6 @@ class _ComplaintConfirmationScreenState
 
   String _districtAwareEntityLabel(String? value, {String? district}) {
     final label = value?.trim() ?? '';
-    if (label.isEmpty) {
-      final name = district?.trim();
-      return name == null || name.isEmpty
-          ? 'Atención territorial en tu distrito'
-          : 'Atención territorial en $name';
-    }
-
     String normalize(String text) => text
         .toLowerCase()
         .replaceAll(RegExp(r'[áàäâ]'), 'a')
@@ -230,15 +223,26 @@ class _ComplaintConfirmationScreenState
       'entidad por identificar',
       'institucion por identificar',
       'organismo por identificar',
+      'entidad no disponible',
+      'institucion no disponible',
       'opcion territorial seleccionada',
       'revision de competencia',
       'por determinar',
     };
-    final isGeneric = genericLabels.contains(normalized) ||
-        normalized.contains('entidad competente') ||
-        normalized.contains('organismo competente') ||
-        normalized.contains('institucion competente') ||
-        normalized.contains('por identificar');
+    final hasGenericSubject = normalized.contains('entidad') ||
+        normalized.contains('organismo') ||
+        normalized.contains('institucion') ||
+        normalized.contains('autoridad');
+    final hasGenericQualifier = normalized.contains('competente') ||
+        normalized.contains('correspondiente') ||
+        normalized.contains('responsable') ||
+        normalized.contains('por identificar') ||
+        normalized.contains('no disponible') ||
+        normalized.contains('por determinar');
+    final isGeneric = label.isEmpty ||
+        genericLabels.contains(normalized) ||
+        (hasGenericSubject && hasGenericQualifier) ||
+        normalized.contains('revision de competencia');
 
     if (!isGeneric) return label;
 
@@ -767,7 +771,7 @@ class _ComplaintConfirmationScreenState
         );
       }
     }
-    return 'Opción territorial seleccionada';
+    return _districtAwareEntityLabel(null, district: widget.district);
   }
 
   Widget _buildEntityCard(Authority? autoridad) {
@@ -946,7 +950,7 @@ class _ComplaintConfirmationScreenState
                                     if (district.isNotEmpty) ...[
                                       const SizedBox(height: 4),
                                       Text(
-                                        district,
+                                        'Distrito de $district',
                                         style: Theme.of(context)
                                             .textTheme
                                             .bodySmall
