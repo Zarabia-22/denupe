@@ -708,10 +708,12 @@ class _ComplaintConfirmationScreenState
   String _selectedTerritorialOptionName() {
     for (final entity in _availableEntities) {
       if (entity.categoriaCode == _selectedTerritorialCategoryCode) {
-        return entity.nombre;
+        final reference = entity.entidadReferencia?.trim();
+        if (reference != null && reference.isNotEmpty) return reference;
+        return 'Opción territorial seleccionada';
       }
     }
-    return _selectedTerritorialCategoryCode ?? '';
+    return 'Opción territorial seleccionada';
   }
 
   Widget _buildEntityCard(Authority? autoridad) {
@@ -766,8 +768,8 @@ class _ComplaintConfirmationScreenState
                           const SizedBox(height: 2),
                           Text(
                             widget.district?.trim().isNotEmpty == true
-                                ? 'Revisa todas las instituciones registradas para el distrito ${widget.district!.trim()}, detectado mediante GPS.'
-                                : 'Revisa todas las instituciones registradas para el distrito detectado mediante GPS.',
+                                ? 'Selecciona el organismo o canal de atención disponible para ${widget.district!.trim()}.'
+                                : 'Selecciona el organismo o canal de atención correspondiente a tu ubicación.',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: Colors.grey.shade600),
                           ),
@@ -829,45 +831,92 @@ class _ComplaintConfirmationScreenState
                         : _selectedPublicEntity?.id == entity.id;
                     final district =
                         entity.ambito['distrito'] ?? widget.district ?? '';
+                    final reference = entity.entidadReferencia?.trim();
+                    final displayName = reference != null && reference.isNotEmpty
+                        ? reference
+                        : 'Entidad por identificar';
                     return Container(
-                      margin: const EdgeInsets.only(bottom: 7),
+                      margin: const EdgeInsets.only(bottom: 9),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(11),
+                        color: selected
+                            ? DenuPeColors.primary.withValues(alpha: 0.055)
+                            : DenuPeColors.surface,
+                        borderRadius: BorderRadius.circular(13),
                         border: Border.all(
                           color: selected
                               ? DenuPeColors.primary
                               : Colors.grey.shade300,
                           width: selected ? 1.5 : 1,
                         ),
-                        color: selected
-                            ? DenuPeColors.primary.withValues(alpha: 0.06)
-                            : null,
                       ),
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 2,
-                        ),
-                        leading: Icon(
-                          selected
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_off,
-                          color: selected
-                              ? DenuPeColors.primary
-                              : Colors.grey,
-                        ),
-                        title: Text(
-                          entity.nombre,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: Text([
-                          if ((entity.entidadReferencia ?? '').isNotEmpty) entity.entidadReferencia!,
-                          if (district.isNotEmpty) district,
-                        ].join(' · ')),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(13),
                         onTap: (_confirming || _suggestingEntity)
                             ? null
                             : () => _selectPublicEntity(entity),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 13,
+                            vertical: 13,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: DenuPeColors.primary.withValues(alpha: 0.09),
+                                  borderRadius: BorderRadius.circular(11),
+                                ),
+                                child: const Icon(
+                                  Icons.account_balance_outlined,
+                                  color: DenuPeColors.primary,
+                                  size: 21,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      displayName,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                            color: DenuPeColors.text,
+                                          ),
+                                    ),
+                                    if (district.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        district,
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: Colors.grey.shade600,
+                                            ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(
+                                selected
+                                    ? Icons.check_circle
+                                    : Icons.circle_outlined,
+                                color: selected
+                                    ? DenuPeColors.primary
+                                    : Colors.grey.shade400,
+                                size: 21,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     );
                   }),
@@ -890,7 +939,7 @@ class _ComplaintConfirmationScreenState
                         const SizedBox(width: 7),
                         Expanded(
                           child: Text(
-                            'Seleccionada: ${_selectedPublicEntity?.nombre ?? _selectedTerritorialOptionName()}',
+                            'Opción seleccionada: ${_selectedPublicEntity?.nombre ?? _selectedTerritorialOptionName()}',
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
