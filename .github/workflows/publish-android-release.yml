@@ -1,15 +1,15 @@
-name: Publicar APK Android v1.4.7
+name: Publicar APK Android v1.4.8
 
 on:
   push:
     branches:
-      - release/v1.4.7
+      - release/v1.4.8
 
 permissions:
   contents: write
 
 concurrency:
-  group: denupe-release-v1.4.7
+  group: denupe-release-v1.4.8
   cancel-in-progress: false
 
 jobs:
@@ -62,27 +62,29 @@ jobs:
 
       - name: Preparar APK y checksum
         run: |
-          cp build/app/outputs/flutter-apk/app-release.apk denupe-1.4.7.apk
-          sha256sum denupe-1.4.7.apk > denupe-1.4.7.apk.sha256
+          cp build/app/outputs/flutter-apk/app-release.apk denupe-1.4.8.apk
+          sha256sum denupe-1.4.8.apk > denupe-1.4.8.apk.sha256
 
-      - name: Publicar GitHub Release v1.4.7
+      - name: Publicar GitHub Release v1.4.8
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.4.7
+          tag_name: v1.4.8
           target_commitish: ${{ github.sha }}
-          name: DenuPe 1.4.7 (PMV 2)
+          name: DenuPe 1.4.8 (PMV 2)
           draft: false
           prerelease: false
           make_latest: true
           generate_release_notes: false
           body: |
-            ## DenuPe 1.4.7 — PMV 2
+            ## DenuPe 1.4.8 — PMV 2
 
-            Esta versión mejora la presentación del selector territorial con tarjetas minimalistas. Las opciones muestran el organismo o canal de atención, el distrito y el estado de selección, sin exponer los nombres de las categorías.
+            Esta versión mejora la presentación del selector territorial con tarjetas minimalistas y etiquetas vinculadas directamente al distrito. Cuando el catálogo no identifica una institución pública concreta, la interfaz muestra «Atención territorial en [distrito]» en lugar de expresiones genéricas.
 
             ### Novedades
             - Presenta las ocho opciones territoriales en tarjetas minimalistas, priorizando el nombre del organismo o canal de atención sobre el nombre de la categoría.
             - Muestra el distrito como información secundaria y resalta visualmente la opción seleccionada.
+            - Sustituye etiquetas genéricas como «Entidad competente» o «Entidad por identificar» por «Atención territorial en [distrito]» cuando no existe un nombre institucional concreto verificado.
+            - Conserva los nombres reales de instituciones cuando el catálogo sí los proporciona.
             - Guarda la ruta territorial elegida separada del identificador de una institución pública concreta.
             - Mantiene la sugerencia de entidad mediante IA como alternativa cuando el ciudadano no tiene certeza sobre qué opción elegir.
             - La recomendación de entidad mediante IA solo se solicita al pulsar **Sugerir entidad**.
@@ -96,6 +98,6 @@ jobs:
             ### Configuración del APK
             El APK se compila en modo release. La configuración Android actual utiliza la firma de depuración para este tipo de compilación, por lo que está destinado a instalación directa y pruebas; antes de distribuirlo mediante Google Play se debe configurar una clave de firma de producción.
           files: |
-            denupe-1.4.7.apk
-            denupe-1.4.7.apk.sha256
+            denupe-1.4.8.apk
+            denupe-1.4.8.apk.sha256
           fail_on_unmatched_files: true
