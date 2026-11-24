@@ -198,6 +198,56 @@ class _ComplaintConfirmationScreenState
     return categoryNameFromCache(widget.categoryId);
   }
 
+
+  String _districtAwareEntityLabel(String? value, {String? district}) {
+    final label = value?.trim() ?? '';
+    if (label.isEmpty) {
+      final name = district?.trim();
+      return name == null || name.isEmpty
+          ? 'Atención territorial en tu distrito'
+          : 'Atención territorial en $name';
+    }
+
+    String normalize(String text) => text
+        .toLowerCase()
+        .replaceAll(RegExp(r'[áàäâ]'), 'a')
+        .replaceAll(RegExp(r'[éèëê]'), 'e')
+        .replaceAll(RegExp(r'[íìïî]'), 'i')
+        .replaceAll(RegExp(r'[óòöô]'), 'o')
+        .replaceAll(RegExp(r'[úùüû]'), 'u')
+        .replaceAll('ñ', 'n')
+        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+        .trim();
+
+    final normalized = normalize(label);
+    const genericLabels = {
+      'entidad competente',
+      'organismo competente',
+      'institucion competente',
+      'entidad correspondiente',
+      'organismo correspondiente',
+      'institucion correspondiente',
+      'entidad por identificar',
+      'institucion por identificar',
+      'organismo por identificar',
+      'opcion territorial seleccionada',
+      'revision de competencia',
+      'por determinar',
+    };
+    final isGeneric = genericLabels.contains(normalized) ||
+        normalized.contains('entidad competente') ||
+        normalized.contains('organismo competente') ||
+        normalized.contains('institucion competente') ||
+        normalized.contains('por identificar');
+
+    if (!isGeneric) return label;
+
+    final name = district?.trim();
+    return name == null || name.isEmpty
+        ? 'Atención territorial en tu distrito'
+        : 'Atención territorial en $name';
+  }
+
   Map<String, String>? _territoryForDistrict(String? value) {
     if (value == null || value.trim().isEmpty) return null;
     String normalize(String text) => text.toLowerCase().trim()
@@ -505,7 +555,10 @@ class _ComplaintConfirmationScreenState
           ),
           const SizedBox(height: 16),
           Text(
-            entity?.nombre ?? 'Entidad no disponible',
+            _districtAwareEntityLabel(
+              entity?.nombre,
+              district: entity?.ambito['distrito'] ?? widget.district,
+            ),
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: DenuPeColors.text,
@@ -708,9 +761,10 @@ class _ComplaintConfirmationScreenState
   String _selectedTerritorialOptionName() {
     for (final entity in _availableEntities) {
       if (entity.categoriaCode == _selectedTerritorialCategoryCode) {
-        final reference = entity.entidadReferencia?.trim();
-        if (reference != null && reference.isNotEmpty) return reference;
-        return 'Opción territorial seleccionada';
+        return _districtAwareEntityLabel(
+          entity.entidadReferencia,
+          district: entity.ambito['distrito'] ?? widget.district,
+        );
       }
     }
     return 'Opción territorial seleccionada';
@@ -831,10 +885,10 @@ class _ComplaintConfirmationScreenState
                         : _selectedPublicEntity?.id == entity.id;
                     final district =
                         entity.ambito['distrito'] ?? widget.district ?? '';
-                    final reference = entity.entidadReferencia?.trim();
-                    final displayName = reference != null && reference.isNotEmpty
-                        ? reference
-                        : 'Entidad por identificar';
+                    final displayName = _districtAwareEntityLabel(
+                      entity.entidadReferencia,
+                      district: district,
+                    );
                     return Container(
                       margin: const EdgeInsets.only(bottom: 9),
                       decoration: BoxDecoration(
