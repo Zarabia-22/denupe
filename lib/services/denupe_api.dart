@@ -48,8 +48,8 @@ class DenupeApi {
     switch(method){case 'GET':return _client.get(uri,headers:h);case 'POST':return _client.post(uri,headers:h,body:b);case 'PATCH':return _client.patch(uri,headers:h,body:b);case 'DELETE':return _client.delete(uri,headers:h);default:throw ArgumentError(method);}
   }
   Future<Map<String,dynamic>> _request(String method,String path,{Map<String,dynamic>? body,Map<String,String>? query,bool auth=true,bool retry=true})async{
-    var r=await _send(method,path,body:body,query:query,auth:auth);
-    if(r.statusCode==401&&auth&&retry&&_refresh!=null&&path!='/auth/refresh'){if(await _refreshSession())r=await _send(method,path,body:body,query:query);}
+    var r=await _send(method,path,body:body,query:query,auth:auth).timeout(const Duration(seconds:30));
+    if(r.statusCode==401&&auth&&retry&&_refresh!=null&&path!='/auth/refresh'){if(await _refreshSession())r=await _send(method,path,body:body,query:query).timeout(const Duration(seconds:30));}
     if(r.statusCode<200||r.statusCode>=300)throw _exception(r);
     if(r.bodyBytes.isEmpty)return {};
     final v=jsonDecode(utf8.decode(r.bodyBytes));return v is Map?Map<String,dynamic>.from(v):{'data':v};
@@ -93,7 +93,7 @@ class DenupeApi {
 
   Future<ComplaintMedia> uploadComplaintMedia({required String complaintId,required Uint8List bytes,required String filename,required String contentType,required String mediaType})async{
     final up=await _request('POST','/denuncias/$complaintId/adjuntos/upload-url',body:{'filename':filename,'mime_type':contentType,'size_bytes':bytes.length});
-    final put=await _client.put(Uri.parse(up['upload_url'].toString()),headers:Map<String,String>.from(up['headers'] as Map),body:bytes);
+    final put=await _client.put(Uri.parse(up['upload_url'].toString()),headers:Map<String,String>.from(up['headers'] as Map),body:bytes).timeout(const Duration(seconds:60));
     if(put.statusCode<200||put.statusCode>=300)throw DenupeApiException('No se pudo subir la evidencia a R2.',statusCode:put.statusCode);
     final d=await _request('POST','/denuncias/$complaintId/adjuntos/confirm',body:{'storage_key':up['storage_key']});
     d['complaint_id']=complaintId;d['user_id']=_user?.id??'';d['url']='';return ComplaintMedia.fromJson(d);
