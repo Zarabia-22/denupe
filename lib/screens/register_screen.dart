@@ -75,7 +75,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // regresar a la raíz para que el menú principal quede visible.
       if (!mounted) return;
       setState(() => _verified = true);
-    } on InsforgeException catch (e) {
+    } on DenupeApiException catch (e) {
       _showMessage(e.message);
     } catch (_) {
       _showMessage('Error de conexión');
@@ -89,7 +89,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       await api.sendVerificationEmail(_email.text.trim());
       _showMessage('Código reenviado');
-    } on InsforgeException catch (e) {
+    } on DenupeApiException catch (e) {
       _showMessage(e.message);
     } finally {
       if (mounted) setState(() => _loading = false);
