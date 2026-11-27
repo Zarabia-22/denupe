@@ -1,0 +1,17 @@
+ALTER TABLE public.notificaciones ADD COLUMN IF NOT EXISTS sms_sent_at timestamptz;
+ALTER TABLE public.notificaciones ADD COLUMN IF NOT EXISTS sms_attempts integer NOT NULL DEFAULT 0;
+ALTER TABLE public.notificaciones ADD COLUMN IF NOT EXISTS sms_last_error text;
+ALTER TABLE public.notificaciones ADD COLUMN IF NOT EXISTS sms_provider_id text;
+ALTER TABLE public.notificaciones ADD COLUMN IF NOT EXISTS sms_claimed_at timestamptz;
+REVOKE UPDATE ON public.notificaciones FROM anon;
+REVOKE INSERT ON public.notificaciones FROM anon;
+CREATE INDEX IF NOT EXISTS notificaciones_sms_pending_idx ON public.notificaciones (sms_sent_at, created_at);
+CREATE OR REPLACE FUNCTION public.claim_notificaciones_sms(p_limit integer DEFAULT 20) RETURNS TABLE (notification_id uuid, phone text, title text, body text, attempts integer) LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$ BEGIN RETURN QUERY WITH candidates AS (SELECT n.id FROM public.notificaciones n WHERE n.sms_sent_at IS NULL AND n.sms_attempts < 3 AND (n.sms_claimed_at IS NULL OR n.sms_claimed_at < now() - interval '5 minutes') ORDER BY n.created_at FOR UPDATE OF n SKIP LOCKED LIMIT LEAST(GREATEST(p_limit, 1), 50)) UPDATE public.notificaciones n SET sms_claimed_at = now(), sms_attempts = n.sms_attempts + 1 FROM candidates c WHERE n.id = c.id RETURNING n.id, COALESCE((SELECT NULLIF(btrim(p.phone), '') FROM public.perfiles p WHERE p.id = n.user_id), (SELECT NULLIF(btrim(d.denunciante_telefono), '') FROM public.denuncias d WHERE d.id = n.complaint_id), '') AS phone, n.title, n.body, n.sms_attempts; END; $$;
+CREATE OR REPLACE FUNCTION public.mark_notificacion_sms_enviado(p_id uuid, p_provider_id text) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$ BEGIN UPDATE public.notificaciones SET sms_sent_at = now(), sms_provider_id = p_provider_id, sms_last_error = NULL, sms_claimed_at = NULL WHERE id = p_id; END; $$;
+CREATE OR REPLACE FUNCTION public.mark_notificacion_sms_fallido(p_id uuid, p_error text, p_retry boolean DEFAULT true) RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path = pg_catalog, public, pg_temp AS $$ BEGIN UPDATE public.notificaciones SET sms_last_error = left(p_error, 500), sms_claimed_at = NULL, sms_attempts = CASE WHEN p_retry THEN sms_attempts ELSE 3 END WHERE id = p_id; END; $$;
+REVOKE ALL ON FUNCTION public.claim_notificaciones_sms(integer) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.claim_notificaciones_sms(integer) TO project_admin;
+REVOKE ALL ON FUNCTION public.mark_notificacion_sms_enviado(uuid, text) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.mark_notificacion_sms_enviado(uuid, text) TO project_admin;
+REVOKE ALL ON FUNCTION public.mark_notificacion_sms_fallido(uuid, text, boolean) FROM anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.mark_notificacion_sms_fallido(uuid, text, boolean) TO project_admin;

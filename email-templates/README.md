@@ -1,20 +1,36 @@
-# Plantilla de verificación de correo — DenuPe
+# Plantillas de correo de autenticación — DenuPe
 
-Diseño HTML responsive basado en la opción 3 aprobada: encabezado ilustrado de ciudad, código resaltado en amarillo, recordatorio de seguridad y tres pasos de activación.
+Los diseños HTML de este directorio son la fuente visual de los correos de verificación y recuperación de contraseña. Las copias activas que utiliza el backend se encuentran en:
 
-## Instalación en InsForge
+- `Zarabia-22/denupe-backend/app/templates/verification-email.html`
+- `Zarabia-22/denupe-backend/app/templates/password-reset-code.html`
 
-1. Abre la configuración de plantillas de correo de autenticación de tu proyecto InsForge.
-2. Selecciona la plantilla de **verificación por código**.
-3. Copia el contenido de `verification-email.html` en el editor HTML.
-4. **Importante:** usa `{{code}}` como variable del código OTP (ajústala a la que admita tu instancia de InsForge si difiere).
-5. Asunto sugerido: `DenuPe | Confirma tu correo electrónico`.
-6. Envía un correo de prueba y comprueba el código real en Gmail y Outlook.
+Cuando se modifique un diseño, deben mantenerse sincronizadas ambas copias y ejecutar las pruebas de `tests/test_email_service.py` del backend.
 
-## Notas
+## Plantillas
 
-- No modifica el flujo de autenticación de Flutter ni envía correos por sí mismo.
-- Se usa HTML con tablas y estilos inline para mejorar compatibilidad con clientes de correo.
-- Los iconos ilustrativos son emojis: su apariencia puede variar según el cliente de correo.
-- No se fija un tiempo de expiración concreto porque debe coincidir con el configurado en InsForge.
-- No se añadieron enlaces a redes sociales ficticias.
+| Archivo | Uso | Asunto |
+|---|---|---|
+| `verification-email.html` | Verificación de cuenta nueva mediante OTP | `DenuPe | Confirma tu correo electrónico` |
+| `password-reset-code.html` | Recuperación de contraseña mediante OTP | `DenuPe | Código para restablecer tu contraseña` |
+
+## Envío
+
+Flutter no envía correos ni accede directamente a un proveedor de email. La aplicación solicita las operaciones al backend FastAPI:
+
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/email/resend`
+- `POST /api/v1/auth/email/verify`
+- `POST /api/v1/auth/password-reset/request`
+- `POST /api/v1/auth/password-reset/resend`
+- `POST /api/v1/auth/password-reset/exchange`
+- `POST /api/v1/auth/password-reset/confirm`
+
+El backend renderiza la plantilla HTML y genera también una versión de texto plano. En Render Free, el envío se realiza mediante la API HTTPS de Resend; SMTP queda disponible como alternativa para entornos que permitan conexiones SMTP salientes.
+
+## Variables dinámicas
+
+- `{{ token }}`: código OTP, escapado como HTML antes de insertarse.
+- `{{ expiry_minutes }}`: tiempo de vigencia configurado en el backend.
+
+No deben agregarse secretos, direcciones de destinatarios ni credenciales del proveedor a estas plantillas. La API key de Resend y la dirección remitente se configuran exclusivamente en el entorno del backend.

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:insforge_flutter/insforge_flutter.dart';
+import 'package:flutter/services.dart';
 
 import '../services/app_scope.dart';
+import '../services/denupe_api.dart';
 import '../theme/denupe_colors.dart';
 import 'register_screen.dart';
 
@@ -34,9 +35,10 @@ class _LoginScreenState extends State<LoginScreen> {
       await api.signIn(
         email: _email.text.trim(),
         password: _password.text,
+        rememberMe: _remember,
       );
       // El AuthGate detecta el inicio de sesión vía onAuthStateChange.
-    } on InsforgeException catch (e) {
+    } on DenupeApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(e.message)));
@@ -112,7 +114,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         Checkbox(value: _remember, activeColor: DenuPeColors.primary, onChanged: (v) => setState(() => _remember = v ?? true)),
                         const Text('Recordarme', style: TextStyle(fontSize: 13)),
                         const Spacer(),
-                        Flexible(child: TextButton(onPressed: _showRecoveryInfo, child: const Text('¿Olvidaste tu contraseña?', textAlign: TextAlign.end, style: TextStyle(fontSize: 12)))),
+                        Flexible(child: TextButton(onPressed: _showRecoveryDialog, child: const Text('¿Olvidaste tu contraseña?', textAlign: TextAlign.end, style: TextStyle(fontSize: 12)))),
                       ]),
                       const SizedBox(height: 22),
                       SizedBox(height: 54, child: FilledButton(
@@ -137,11 +139,284 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  void _showRecoveryInfo() {
-    showDialog<void>(context: context, builder: (context) => AlertDialog(
-      title: const Text('Recuperar contraseña'),
-      content: const Text('La recuperación por correo aún no está habilitada en esta versión. Contacta al equipo de soporte para recuperar el acceso.'),
-      actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Entendido'))],
-    ));
+  void _showRecoveryDialog() {
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _PasswordRecoveryDialog(initialEmail: _email.text.trim()),
+    );
+  }
+}
+
+class _PasswordRecoveryDialog extends StatefulWidget {
+  const _PasswordRecoveryDialog({required this.initialEmail});
+
+  final String initialEmail;
+
+  @override
+  State<_PasswordRecoveryDialog> createState() => _PasswordRecoveryDialogState();
+}
+
+class _PasswordRecoveryDialogState extends State<_PasswordRecoveryDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _email;
+  final _code = TextEditingController();
+  final _password = TextEditingController();
+  final _confirmPassword = TextEditingController();
+  int _step = 0;
+  bool _loading = false;
+  bool _showPassword = false;
+  String? _error;
+  String _token = '';
+
+  static const _titles = [
+    'Recuperar contraseña',
+    'Verifica tu correo',
+    'Nueva contraseña',
+    'Contraseña actualizada',
+  ];
+
+  final _emailValidator = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
+
+  @override
+  void initState() {
+    super.initState();
+    _email = TextEditingController(text: widget.initialEmail);
+  }
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _code.dispose();
+    _password.dispose();
+    _confirmPassword.dispose();
+    super.dispose();
+  }
+
+  String _errorMessage(Object error) =>
+      error is DenupeApiException ? error.message : 'Error de conexión. Intenta nuevamente.';
+
+  Future<void> _sendCode({bool stayOnStep = false}) async {
+    if (!stayOnStep && !_formKey.currentState!.validate()) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await api.requestPasswordReset(email: _email.text.trim());
+      if (!mounted) return;
+      setState(() {
+        if (!stayOnStep) _step = 1;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = _errorMessage(error));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _resendCode() => _sendCode(stayOnStep: true);
+
+  Future<void> _verifyCode() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      _token = await api.exchangePasswordResetCode(
+        email: _email.text.trim(),
+        code: _code.text.trim(),
+      );
+      if (!mounted) return;
+      setState(() => _step = 2);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = _errorMessage(error));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _changePassword() async {
+    if (!_formKey.currentState!.validate()) return;
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    try {
+      await api.resetPassword(
+        token: _token,
+        newPassword: _password.text,
+      );
+      if (!mounted) return;
+      setState(() => _step = 3);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() => _error = _errorMessage(error));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Widget _buildContent(ThemeData theme) {
+    if (_step == 3) {
+      return const Text(
+        'Tu contraseña se actualizó correctamente. Inicia sesión con la nueva contraseña.',
+        style: TextStyle(height: 1.45),
+      );
+    }
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        if (_step == 0)
+          const Text(
+            'Ingresa tu correo. Guardaremos la solicitud y te enviaremos un código de 6 dígitos.',
+            style: TextStyle(height: 1.45),
+          ),
+        if (_step == 1)
+          Text(
+            'Ingresa el código enviado a ${_email.text.trim()}.',
+            style: const TextStyle(height: 1.45),
+          ),
+        if (_step == 2)
+          const Text(
+            'El código es válido. Elige una nueva contraseña de al menos 8 caracteres.',
+            style: TextStyle(height: 1.45),
+          ),
+        const SizedBox(height: 20),
+        if (_step == 0)
+          TextFormField(
+            controller: _email,
+            autofocus: true,
+            keyboardType: TextInputType.emailAddress,
+            autocorrect: false,
+            decoration: const InputDecoration(
+              labelText: 'Correo electrónico',
+              hintText: 'tu@email.com',
+              prefixIcon: Icon(Icons.mail_outline),
+              border: OutlineInputBorder(),
+            ),
+            validator: (v) => v == null || !_emailValidator.hasMatch(v.trim())
+                ? 'Ingresa un correo electrónico válido'
+                : null,
+          ),
+        if (_step == 1)
+          TextFormField(
+            controller: _code,
+            autofocus: true,
+            textAlign: TextAlign.center,
+            keyboardType: TextInputType.number,
+            maxLength: 6,
+            inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+            style: const TextStyle(fontSize: 26, letterSpacing: 10),
+            decoration: const InputDecoration(
+              hintText: '••••••',
+              counterText: '',
+              border: OutlineInputBorder(),
+            ),
+            validator: (v) => v == null || v.length != 6
+                ? 'Ingresa los 6 dígitos'
+                : null,
+          ),
+        if (_step == 2) ...[
+          TextFormField(
+            controller: _password,
+            autofocus: true,
+            obscureText: !_showPassword,
+            decoration: InputDecoration(
+              labelText: 'Nueva contraseña',
+              prefixIcon: const Icon(Icons.lock_outline),
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                tooltip: _showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña',
+                onPressed: () => setState(() => _showPassword = !_showPassword),
+                icon: Icon(_showPassword
+                    ? Icons.visibility_outlined
+                    : Icons.visibility_off_outlined),
+              ),
+            ),
+            validator: (v) => v == null || v.length < 8
+                ? 'Mínimo 8 caracteres'
+                : null,
+          ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _confirmPassword,
+            obscureText: !_showPassword,
+            decoration: const InputDecoration(
+              labelText: 'Confirmar contraseña',
+              prefixIcon: Icon(Icons.lock_outline),
+              border: OutlineInputBorder(),
+            ),
+            validator: (v) => v != _password.text
+                ? 'Las contraseñas no coinciden'
+                : null,
+          ),
+        ],
+        if (_step == 1)
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton(
+              onPressed: _loading ? null : _resendCode,
+              child: const Text('Reenviar código'),
+            ),
+          ),
+        if (_error != null) ...[
+          const SizedBox(height: 8),
+          Text(
+            _error!,
+            style: TextStyle(color: theme.colorScheme.error, fontSize: 13),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _buildAction({
+    required String label,
+    required VoidCallback? onPressed,
+    bool busy = false,
+  }) {
+    return TextButton(
+      onPressed: _loading ? null : onPressed,
+      child: busy
+          ? const SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : Text(label),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return AlertDialog(
+      title: Text(_titles[_step]),
+      content: SizedBox(
+        width: 360,
+        child: Form(key: _formKey, child: _buildContent(theme)),
+      ),
+      actions: [
+        if (_step == 0) ...[
+          _buildAction(label: 'Cancelar', onPressed: () => Navigator.of(context).pop()),
+          _buildAction(label: 'Enviar código', onPressed: _sendCode, busy: _loading),
+        ],
+        if (_step == 1) ...[
+          _buildAction(label: 'Volver', onPressed: () => setState(() => _step = 0)),
+          _buildAction(label: 'Verificar', onPressed: _verifyCode, busy: _loading),
+        ],
+        if (_step == 2) ...[
+          _buildAction(label: 'Cancelar', onPressed: () => Navigator.of(context).pop()),
+          _buildAction(label: 'Cambiar contraseña', onPressed: _changePassword, busy: _loading),
+        ],
+        if (_step == 3)
+          _buildAction(label: 'Cerrar', onPressed: () => Navigator.of(context).pop()),
+      ],
+    );
   }
 }

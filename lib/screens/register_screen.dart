@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../theme/denupe_colors.dart';
-import 'package:insforge_flutter/insforge_flutter.dart';
 
 import '../services/app_scope.dart';
+import '../services/denupe_api.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -56,7 +56,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _showMessage('Cuenta creada');
         Navigator.of(context).pop();
       }
-    } on InsforgeException catch (e) {
+    } on DenupeApiException catch (e) {
       _showMessage(e.message);
     } catch (_) {
       _showMessage('Error de conexión');
@@ -75,7 +75,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // regresar a la raíz para que el menú principal quede visible.
       if (!mounted) return;
       setState(() => _verified = true);
-    } on InsforgeException catch (e) {
+    } on DenupeApiException catch (e) {
       _showMessage(e.message);
     } catch (_) {
       _showMessage('Error de conexión');
@@ -89,7 +89,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       await api.sendVerificationEmail(_email.text.trim());
       _showMessage('Código reenviado');
-    } on InsforgeException catch (e) {
+    } on DenupeApiException catch (e) {
       _showMessage(e.message);
     } finally {
       if (mounted) setState(() => _loading = false);

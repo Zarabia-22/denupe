@@ -8,6 +8,7 @@ import 'package:http/testing.dart';
 import 'package:denupe/models.dart';
 import 'package:denupe/services/ai_category_service.dart';
 import 'package:denupe/services/ai_entity_service.dart';
+import 'package:denupe/services/entity_display_name.dart';
 
 void main() {
   group('models', () {
@@ -198,7 +199,7 @@ void main() {
       dotenv.loadFromString(envString: 'DENUPE_IA_URL=https://api.example.test');
       final client = MockClient((request) async {
         expect(request.method, 'POST');
-        expect(request.url.path, '/api/ia/sugerir-entidad');
+        expect(request.url.path, '/api/v1/ia/sugerir-entidad');
         final body = jsonDecode(request.body) as Map<String, dynamic>;
         expect(body['categoria'], 'Agua y saneamiento');
         expect(body['departamento'], 'Lima');
@@ -306,6 +307,50 @@ void main() {
       expect(suggestion.sugerida, isFalse);
       expect(suggestion.entidad, isNull);
       expect(suggestion.motivo, contains('territorial'));
+    });
+  });
+
+  group('nombres dinámicos de entidades', () {
+    test('reemplaza etiquetas genéricas por el distrito y el tipo', () {
+      expect(
+        entityDisplayName(
+          reference: 'Municipalidad provincial o distrital competente del UBIGEO',
+          type: 'municipalidad',
+          district: 'Miraflores',
+        ),
+        'Municipalidad de Miraflores',
+      );
+      expect(
+        entityDisplayName(
+          reference: 'Empresa concesionaria de distribución eléctrica competente',
+          type: 'concesionaria_electrica',
+          district: 'Miraflores',
+        ),
+        'Empresa eléctrica de Miraflores',
+      );
+      expect(
+        entityDisplayName(
+          reference: 'Revisión de competencia',
+          type: 'revision_competencia',
+          district: 'Miraflores',
+        ),
+        'Atención territorial de Miraflores',
+      );
+    });
+
+    test('conserva nombres específicos y usa un respaldo sin distrito', () {
+      expect(
+        entityDisplayName(
+          reference: 'SEDAPAL Lima',
+          type: 'empresa_saneamiento',
+          district: 'Miraflores',
+        ),
+        'SEDAPAL Lima',
+      );
+      expect(
+        entityDisplayName(reference: 'Entidad competente', district: ''),
+        'Atención territorial',
+      );
     });
   });
 

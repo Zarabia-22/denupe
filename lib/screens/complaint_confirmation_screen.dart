@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../theme/denupe_colors.dart';
 import '../widgets/location_preview.dart';
-import 'package:insforge_flutter/insforge_flutter.dart';
 
 import '../models.dart';
 import '../services/app_scope.dart';
+import '../services/denupe_api.dart';
 import '../services/ai_entity_service.dart';
+import '../services/entity_display_name.dart';
 
 class ComplaintConfirmationScreen extends StatefulWidget {
   const ComplaintConfirmationScreen({
@@ -41,7 +42,9 @@ class _ComplaintConfirmationScreenState
     extends State<ComplaintConfirmationScreen> {
   List<Authority> _autoridades = [];
   List<AiPublicEntity> _availableEntities = [];
+  String? _resolvedDistrict;
   AiPublicEntity? _selectedPublicEntity;
+  String? _selectedTerritorialCategoryCode;
   String _entitySearchQuery = '';
   bool _loadingEntities = false;
   String? _entityCatalogError;
@@ -73,13 +76,12 @@ class _ComplaintConfirmationScreenState
 
 
   Future<void> _loadManualEntities() async {
-    final territory = _territoryForDistrict(widget.district);
-    if (territory == null) {
+    if (widget.latitude == null || widget.longitude == null) {
       if (mounted) {
         setState(() {
           _availableEntities = [];
           _entityCatalogError =
-              'El catálogo inicial de instituciones solo cubre Lima Metropolitana y Callao. Verifica el distrito de tu perfil.';
+              'Necesitamos la ubicación GPS de la denuncia para identificar tu distrito y mostrar sus opciones.';
         });
       }
       return;
@@ -91,23 +93,22 @@ class _ComplaintConfirmationScreenState
       _entityCatalogError = null;
     });
     try {
-      final entities = await AiEntityService().listarEntidadesDisponibles(
-        categoria: _categoryName(),
-        departamento: territory['departamento']!,
-        provincia: territory['provincia']!,
-        distrito: widget.district!.trim(),
-        latitud: widget.latitude,
-        longitud: widget.longitude,
+      final entities = await AiEntityService().listarCatalogoTerritorial(
+        latitud: widget.latitude!,
+        longitud: widget.longitude!,
       );
       if (!mounted) return;
       setState(() {
         _availableEntities = entities;
+        _resolvedDistrict = entities.isEmpty
+            ? widget.district
+            : entities.first.ambito['distrito'] ?? widget.district;
         _entityCatalogError = null;
       });
     } on AiEntityException catch (e) {
       if (!mounted) return;
-      setState(() => _entityCatalogError = e.message);
-      _showMessage(e.message);
+      setState(() => _entityCatalogError = _dynamicEntityMessage(e.message));
+      _showMessage(_entityCatalogError!);
     } catch (_) {
       if (!mounted) return;
       setState(() => _entityCatalogError =
@@ -151,52 +152,40 @@ class _ComplaintConfirmationScreenState
   }
 
   void _selectPublicEntity(AiPublicEntity entity) {
+    // Las opciones territoriales son rutas/categorías, no instituciones.
+    // Se guardan por separado para no enviar el código de categoría como ID
+    // de una entidad pública concreta.
+    if (entity.categoriaCode != null) {
+      setState(() {
+        _selectedTerritorialCategoryCode = entity.categoriaCode;
+        _selectedPublicEntity = null;
+        _selectedAuthorityId = null;
+        _entitySuggestion = null;
+      });
+      return;
+    }
+
     final authorityType = _authorityTypeForEntity(entity.tipo);
     final authoritySigla = _authoritySiglaForEntity(entity.tipo);
     Authority? authority;
-    for (final item in _autoridades) {
-      if (item.tipo == authorityType &&
-          item.isActive &&
-          (authoritySigla == null || item.sigla == authoritySigla)) {
-        authority = item;
-        break;
+    if (authorityType != null) {
+      for (final item in _autoridades) {
+        if (item.tipo == authorityType &&
+            item.isActive &&
+            (authoritySigla == null || item.sigla == authoritySigla)) {
+          authority = item;
+          break;
+        }
       }
-    }
-    if (authority == null) {
-      _showMessage('La institución está identificada, pero falta habilitar su tipo receptor en DenuPe.');
-      return;
     }
     setState(() {
       _selectedPublicEntity = entity;
-      _selectedAuthorityId = authority!.id;
+      _selectedTerritorialCategoryCode = null;
+      _selectedAuthorityId = authority?.id;
       _entitySuggestion = null;
     });
   }
 
-  void _useAutomaticAssignment() {
-    if (_availableEntities.length == 1) {
-      final entity = _availableEntities.single;
-      _selectPublicEntity(entity);
-      if (_selectedPublicEntity?.id == entity.id) {
-        _showMessage(
-          entity.tipo == 'revision_competencia'
-              ? 'La denuncia quedó dirigida a la bandeja interna de revisión de competencia.'
-              : 'DenuPe seleccionó la única institución con competencia verificada: ${entity.nombre}.',
-        );
-      }
-      return;
-    }
-    setState(() {
-      _selectedPublicEntity = null;
-      _selectedAuthorityId = null;
-      _entitySuggestion = null;
-    });
-    _showMessage(
-      _availableEntities.length > 1
-          ? 'Hay varias instituciones posibles. La denuncia pasará a revisión de competencia para evitar una asignación incorrecta.'
-          : 'No hay una institución única verificada. La denuncia pasará a revisión de competencia.',
-    );
-  }
 
   Authority? get _selectedAuthority {
     final id = _selectedAuthorityId;
@@ -212,6 +201,38 @@ class _ComplaintConfirmationScreenState
       if (c.id == widget.categoryId) return c.name;
     }
     return categoryNameFromCache(widget.categoryId);
+  }
+
+
+  String _districtFor(AiPublicEntity? entity) {
+    final fromEntity = entity?.ambito['distrito']?.trim();
+    if (fromEntity != null && fromEntity.isNotEmpty) return fromEntity;
+    final resolved = _resolvedDistrict?.trim();
+    if (resolved != null && resolved.isNotEmpty) return resolved;
+    return widget.district?.trim() ?? '';
+  }
+
+  String _entityLabel(AiPublicEntity entity) => entityDisplayName(
+        reference: entity.entidadReferencia ?? entity.nombre,
+        type: entity.tipo,
+        district: _districtFor(entity),
+      );
+
+  String _districtAwareEntityLabel(String? value, {String? district}) =>
+      entityDisplayName(reference: value, district: district);
+
+  String _dynamicEntityMessage(String message) {
+    final lower = message.toLowerCase();
+    final isGeneric = lower.contains('competente') ||
+        lower.contains('correspondiente') ||
+        lower.contains('por identificar') ||
+        lower.contains('no disponible') ||
+        lower.contains('por determinar');
+    if (!isGeneric) return message;
+    final place = _districtFor(_selectedPublicEntity);
+    return place.isEmpty
+        ? 'No encontramos una opción verificada.'
+        : 'No encontramos una opción verificada en $place.';
   }
 
   Map<String, String>? _territoryForDistrict(String? value) {
@@ -257,7 +278,7 @@ class _ComplaintConfirmationScreenState
     final territory = _territoryForDistrict(widget.district);
     if (territory == null) {
       _showMessage(
-        'Completa tu distrito en el perfil con un distrito de Lima Metropolitana o Callao para consultar la entidad competente.',
+        'Completa tu distrito en el perfil para ver las opciones disponibles cerca de ti.',
       );
       return;
     }
@@ -293,7 +314,7 @@ class _ComplaintConfirmationScreenState
     } on AiEntityException catch (e) {
       error = e.message;
     } catch (_) {
-      error = 'No se pudo obtener la recomendación. La entidad se determinará con la regla predeterminada de la categoría.';
+      error = 'No se pudo obtener la recomendación. Puedes elegir una opción manualmente.';
     } finally {
       if (mounted) {
         Navigator.of(context, rootNavigator: true).pop();
@@ -302,11 +323,13 @@ class _ComplaintConfirmationScreenState
     }
     if (!mounted) return;
     if (error != null) {
-      _showMessage(error);
+      _showMessage(_dynamicEntityMessage(error));
       return;
     }
     if (suggestion?.sugerida != true || suggestion?.entidad == null) {
-      _showMessage(suggestion?.motivo ?? 'No se encontró una entidad verificable.');
+      _showMessage(_dynamicEntityMessage(
+        suggestion?.motivo ?? 'No se encontró una opción verificada.',
+      ));
       return;
     }
     setState(() => _entitySuggestion = suggestion);
@@ -337,6 +360,7 @@ class _ComplaintConfirmationScreenState
         autoridadId: autoridad?.id,
         entidadPublicaId: _selectedPublicEntity?.id,
         entidadPublicaNombre: _selectedPublicEntity?.nombre,
+        rutaTerritorialCode: _selectedTerritorialCategoryCode,
       );
       bumpNotificationsTick();
       for (final item in widget.media) {
@@ -355,7 +379,7 @@ class _ComplaintConfirmationScreenState
       }
       if (!mounted) return;
       Navigator.of(context).pop(true);
-    } on InsforgeException catch (e) {
+    } on DenupeApiException catch (e) {
       if (!mounted) return;
       setState(() => _confirming = false);
       _showMessage(e.message);
@@ -404,7 +428,7 @@ class _ComplaintConfirmationScreenState
         const SizedBox(height: 16),
         _buildEntityCard(autoridad),
         const SizedBox(height: 12),
-        Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(10)), child: const Row(children: [Icon(Icons.info_outline, color: DenuPeColors.primary), SizedBox(width: 8), Expanded(child: Text('Al confirmar, tu denuncia se asignará a la institución seleccionada o pasará a revisión de competencia si no hay una opción única validada.'))])),
+        Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(10)), child: Row(children: [const Icon(Icons.info_outline, color: DenuPeColors.primary), const SizedBox(width: 8), Expanded(child: Text('Al confirmar, tu denuncia se registrará con la opción elegida${_districtFor(null).isEmpty ? '' : ' para ${_districtFor(null)}'} o quedará en análisis interno si no hay una opción válida.'))])),
         const SizedBox(height: 16),
         Row(children: [OutlinedButton(onPressed: _confirming ? null : () => Navigator.of(context).pop(), child: const Text('Editar')), const SizedBox(width: 8), Expanded(child: FilledButton.icon(
           onPressed: _confirming ? null : _confirm,
@@ -423,8 +447,8 @@ class _ComplaintConfirmationScreenState
         if (autoridad == null) ...[
           const SizedBox(height: 8),
           Text(
-            'Si no seleccionas una institución y no existe una opción única validada, '
-            'DenuPe enviará la denuncia a revisión de competencia para evitar una asignación incorrecta.',
+            'Si no eliges una opción, DenuPe derivará la denuncia para análisis interno '
+            'y evitará una asignación incorrecta.',
             textAlign: TextAlign.center,
             style: Theme.of(context)
                 .textTheme
@@ -520,7 +544,9 @@ class _ComplaintConfirmationScreenState
           ),
           const SizedBox(height: 16),
           Text(
-            entity?.nombre ?? 'Entidad no disponible',
+            entity == null
+                ? _districtAwareEntityLabel(null, district: _districtFor(null))
+                : _entityLabel(entity),
             style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w700,
                   color: DenuPeColors.text,
@@ -587,7 +613,7 @@ class _ComplaintConfirmationScreenState
           const SizedBox(height: 10),
           Text(
             isReviewQueue
-                ? 'Este es un destino interno de DenuPe, no una institución pública externa. El equipo revisará la competencia y determinará qué organismo debe recibir la denuncia.'
+                ? 'Este es un destino interno de DenuPe, no una institución pública externa. El equipo revisará el caso y determinará qué organismo debe recibir la denuncia.'
                 : isApplied
                     ? 'Esta institución está seleccionada para tu denuncia.'
                     : canApply
@@ -720,11 +746,27 @@ class _ComplaintConfirmationScreenState
     );
   }
 
+  String _selectedTerritorialOptionName() {
+    for (final entity in _availableEntities) {
+      if (entity.categoriaCode == _selectedTerritorialCategoryCode) {
+        return _districtAwareEntityLabel(
+          entity.entidadReferencia,
+          district: entity.ambito['distrito'] ?? widget.district,
+        );
+      }
+    }
+    return _districtAwareEntityLabel(null, district: widget.district);
+  }
+
   Widget _buildEntityCard(Authority? autoridad) {
+    final channelLabel = _selectedPublicEntity == null
+        ? _districtAwareEntityLabel(autoridad?.nombre, district: _districtFor(null))
+        : _entityLabel(_selectedPublicEntity!);
     final query = _entitySearchQuery.trim().toLowerCase();
     final filtered = _availableEntities.where((entity) {
       if (query.isEmpty) return true;
       return entity.nombre.toLowerCase().contains(query) ||
+          (entity.entidadReferencia ?? '').toLowerCase().contains(query) ||
           entity.tipo.replaceAll('_', ' ').toLowerCase().contains(query) ||
           (entity.ambito['distrito'] ?? '').toLowerCase().contains(query);
     }).toList();
@@ -764,13 +806,17 @@ class _ComplaintConfirmationScreenState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '1. Selecciona una institución',
+                            _districtFor(null).isEmpty
+                                ? '1. Opciones cerca de ti'
+                                : '1. Opciones en ${_districtFor(null)}',
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Elige manualmente quién recibirá tu denuncia.',
+                            _districtFor(null).isEmpty
+                                ? 'Selecciona el canal de atención disponible para tu ubicación.'
+                                : 'Selecciona el canal de atención disponible para ${_districtFor(null)}.',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: Colors.grey.shade600),
                           ),
@@ -807,7 +853,9 @@ class _ComplaintConfirmationScreenState
                         Text(
                           _entityCatalogError ??
                               (_availableEntities.isEmpty
-                                  ? 'No hay instituciones con competencia verificada para esta categoría y ubicación. Puedes dejar que DenuPe determine la asignación o consultar la recomendación de IA.'
+                                  ? _districtFor(null).isEmpty
+                                      ? 'El catálogo no devolvió opciones para tu ubicación. Comprueba la ubicación GPS o vuelve a consultar.'
+                                      : 'El catálogo no devolvió opciones para ${_districtFor(null)}. Comprueba la ubicación GPS o vuelve a consultar.'
                                   : 'No se encontraron instituciones con ese nombre.'),
                           style: Theme.of(context).textTheme.bodySmall,
                         ),
@@ -827,50 +875,97 @@ class _ComplaintConfirmationScreenState
                   )
                 else
                   ...filtered.map((entity) {
-                    final selected = _selectedPublicEntity?.id == entity.id;
-                    final district =
-                        entity.ambito['distrito'] ?? widget.district ?? '';
-                    final type = entity.tipo.replaceAll('_', ' ');
+                    final selected = entity.categoriaCode != null
+                        ? _selectedTerritorialCategoryCode == entity.categoriaCode
+                        : _selectedPublicEntity?.id == entity.id;
+                    final district = _districtFor(entity);
+                    final displayName = _entityLabel(entity);
                     return Container(
-                      margin: const EdgeInsets.only(bottom: 7),
+                      margin: const EdgeInsets.only(bottom: 9),
                       decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(11),
+                        color: selected
+                            ? DenuPeColors.primary.withValues(alpha: 0.055)
+                            : DenuPeColors.surface,
+                        borderRadius: BorderRadius.circular(13),
                         border: Border.all(
                           color: selected
                               ? DenuPeColors.primary
                               : Colors.grey.shade300,
                           width: selected ? 1.5 : 1,
                         ),
-                        color: selected
-                            ? DenuPeColors.primary.withValues(alpha: 0.06)
-                            : null,
                       ),
-                      child: ListTile(
-                        dense: true,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 2,
-                        ),
-                        leading: Icon(
-                          selected
-                              ? Icons.radio_button_checked
-                              : Icons.radio_button_off,
-                          color: selected
-                              ? DenuPeColors.primary
-                              : Colors.grey,
-                        ),
-                        title: Text(
-                          entity.nombre,
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: Text('$type · $district'),
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(13),
                         onTap: (_confirming || _suggestingEntity)
                             ? null
                             : () => _selectPublicEntity(entity),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 13,
+                            vertical: 13,
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  color: DenuPeColors.primary.withValues(alpha: 0.09),
+                                  borderRadius: BorderRadius.circular(11),
+                                ),
+                                child: const Icon(
+                                  Icons.account_balance_outlined,
+                                  color: DenuPeColors.primary,
+                                  size: 21,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      displayName,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodyMedium
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                            color: DenuPeColors.text,
+                                          ),
+                                    ),
+                                    if (district.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        'Distrito de $district',
+                                        style: Theme.of(context)
+                                            .textTheme
+                                            .bodySmall
+                                            ?.copyWith(
+                                              color: Colors.grey.shade600,
+                                            ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Icon(
+                                selected
+                                    ? Icons.check_circle
+                                    : Icons.circle_outlined,
+                                color: selected
+                                    ? DenuPeColors.primary
+                                    : Colors.grey.shade400,
+                                size: 21,
+                              ),
+                            ],
+                          ),
+                        ),
                       ),
                     );
                   }),
-                if (_selectedPublicEntity != null) ...[
+                if (_selectedPublicEntity != null || _selectedTerritorialCategoryCode != null) ...[
                   const SizedBox(height: 5),
                   Container(
                     padding: const EdgeInsets.all(10),
@@ -889,7 +984,7 @@ class _ComplaintConfirmationScreenState
                         const SizedBox(width: 7),
                         Expanded(
                           child: Text(
-                            'Seleccionada: ${_selectedPublicEntity!.nombre}',
+                            'Opción seleccionada: ${_selectedPublicEntity == null ? _selectedTerritorialOptionName() : _entityLabel(_selectedPublicEntity!)}',
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,
@@ -900,21 +995,11 @@ class _ComplaintConfirmationScreenState
                     ),
                   ),
                 ],
-                Align(
-                  alignment: Alignment.centerLeft,
-                  child: TextButton.icon(
-                    onPressed: (_confirming || _suggestingEntity)
-                        ? null
-                        : _useAutomaticAssignment,
-                    icon: const Icon(Icons.auto_fix_high_outlined),
-                    label: const Text('No estoy seguro, que DenuPe decida'),
-                  ),
-                ),
                 if (autoridad != null) ...[
                   const Divider(height: 20),
                   _SummaryRow(
                     label: 'Canal de gestión',
-                    detail: '${autoridad.nombre} (${autoridad.sigla})',
+                    detail: '$channelLabel (${autoridad.sigla})',
                   ),
                 ],
               ],
@@ -956,13 +1041,17 @@ class _ComplaintConfirmationScreenState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '2. ¿Necesitas ayuda para elegir?',
+                            _districtFor(null).isEmpty
+                                ? '2. ¿Necesitas ayuda para elegir?'
+                                : '2. ¿Ayuda para elegir en ${_districtFor(null)}?',
                             style: Theme.of(context).textTheme.titleSmall
                                 ?.copyWith(fontWeight: FontWeight.w700),
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'El asistente analiza la denuncia y su ubicación para sugerir una institución.',
+                            _districtFor(null).isEmpty
+                                ? 'La IA solo buscará una opción específica cuando pulses «Sugerir entidad», usando la categoría, el contenido y tu ubicación.'
+                                : 'La IA solo buscará una opción específica cuando pulses «Sugerir entidad», usando la categoría, el contenido y tu ubicación en ${_districtFor(null)}.',
                             style: Theme.of(context).textTheme.bodySmall
                                 ?.copyWith(color: Colors.grey.shade600),
                           ),
@@ -990,7 +1079,7 @@ class _ComplaintConfirmationScreenState
                     label: Text(
                       _suggestingEntity
                           ? 'Analizando denuncia...'
-                          : 'Recomendar entidad con IA',
+                          : 'Sugerir entidad',
                     ),
                     style: FilledButton.styleFrom(
                       backgroundColor: DenuPeColors.primary,

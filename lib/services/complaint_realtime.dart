@@ -1,6 +1,7 @@
-import 'package:socket_io_client/socket_io_client.dart' as io;
+import 'dart:async';
 
-/// Cambio de estado publicado por el backend en el canal `complaint:<id>`.
+import 'denupe_api.dart';
+
 class StatusChangedEvent {
   StatusChangedEvent({
     required this.complaintId,
@@ -13,100 +14,70 @@ class StatusChangedEvent {
   final DateTime? updatedAt;
 }
 
-/// Cliente realtime sobre socket.io.
-///
-/// Protocolo InsForge: socket.io sobre la base URL con `auth.token`, suscripción
-/// con el evento `realtime:subscribe` y payload `{channel}`. El backend publica
-/// cambios de estado como un evento socket `status_changed` (el trigger
-/// `realtime_complaint_status_change` envía `{id, status, updated_at}`).
+/// Seguimiento de cambios mediante sondeo autenticado del backend REST.
+/// Reutiliza DenupeApi para aprovechar la renovación de tokens JWT.
 class ComplaintRealtime {
-  ComplaintRealtime(this._baseUrl);
+  ComplaintRealtime(this._api);
 
-  final String _baseUrl;
-  io.Socket? _socket;
+  final DenupeApi _api;
+  Timer? _timer;
   final Map<String, List<void Function(StatusChangedEvent)>> _listeners = {};
-  bool _listening = false;
+  final Map<String, String> _lastStatus = {};
 
-  void connect({required String token}) {
-    if (_socket != null) return;
-    _socket = io.io(
-      _baseUrl,
-      io.OptionBuilder()
-          .setTransports(['websocket'])
-          .setAuth({'token': token})
-          .enableReconnection()
-          .build(),
+  void connect() {
+    _timer ??= Timer.periodic(
+      const Duration(seconds: 20),
+      (_) => _pollAll(),
     );
-    _socket!.onConnect((_) {
-      for (final complaintId in _listeners.keys) {
-        _sendSubscribe(complaintId);
-      }
-    });
-    listen();
-  }
-
-  void _sendSubscribe(String complaintId) {
-    _socket?.emit('realtime:subscribe', {'channel': 'complaint:$complaintId'});
-  }
-
-  void listen() {
-    if (_listening) return;
-    _listening = true;
-    _socket?.onAny((event, payload) {
-      if (event != 'status_changed') return;
-      final message = _asMap(payload);
-      final data = _asMap(message['data']);
-      final meta = _asMap(message['meta']);
-
-      var complaintId = data['id']?.toString() ?? '';
-      final channel = meta['channel']?.toString() ??
-          message['channel']?.toString() ??
-          '';
-      if (complaintId.isEmpty && channel.contains('complaint:')) {
-        complaintId = channel
-            .split('complaint:')
-            .last
-            .replaceAll('realtime:', '');
-      }
-
-      final status = data['status']?.toString() ?? message['status']?.toString();
-      if (complaintId.isEmpty || status == null) return;
-
-      final eventData = StatusChangedEvent(
-        complaintId: complaintId,
-        status: status,
-        updatedAt: DateTime.tryParse(data['updated_at']?.toString() ?? ''),
-      );
-      for (final listener in _listeners[complaintId] ?? const <dynamic>[]) {
-        listener(eventData);
-      }
-    });
+    _pollAll();
   }
 
   void subscribeComplaint(
-    String complaintId,
-    void Function(StatusChangedEvent event) listener,
+    String id,
+    void Function(StatusChangedEvent) listener,
   ) {
-    final listeners = _listeners.putIfAbsent(complaintId, () => []);
-    listeners.add(listener);
-    if (_socket?.connected ?? false) {
-      _sendSubscribe(complaintId);
+    _listeners.putIfAbsent(id, () => []).add(listener);
+    _poll(id);
+  }
+
+  void unsubscribeComplaint(String id) {
+    _listeners.remove(id);
+    _lastStatus.remove(id);
+  }
+
+  Future<void> _pollAll() async {
+    for (final id in _listeners.keys.toList()) {
+      await _poll(id);
     }
   }
 
-  void unsubscribeComplaint(String complaintId) {
-    _listeners[complaintId]?.clear();
+  Future<void> _poll(String id) async {
+    try {
+      final complaint = await _api.complaintById(id);
+      if (complaint == null) return;
+
+      final previous = _lastStatus[id];
+      _lastStatus[id] = complaint.status;
+      if (previous != null && previous != complaint.status) {
+        final event = StatusChangedEvent(
+          complaintId: id,
+          status: complaint.status,
+          updatedAt: complaint.updatedAt,
+        );
+        for (final listener
+            in _listeners[id] ?? const <void Function(StatusChangedEvent)>[]) {
+          listener(event);
+        }
+      }
+    } catch (_) {
+      // El sondeo siguiente reintentará sin interrumpir la interfaz.
+    }
   }
 
   void dispose() {
-    _socket?.dispose();
-    _socket = null;
+    _timer?.cancel();
+    _timer = null;
     _listeners.clear();
-    _listening = false;
+    _lastStatus.clear();
   }
-}
-
-Map<String, dynamic> _asMap(Object? value) {
-  if (value is Map) return Map<String, dynamic>.from(value);
-  return <String, dynamic>{};
 }

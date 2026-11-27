@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:insforge_flutter/insforge_flutter.dart';
+import 'services/app_scope.dart';
 
 import 'theme/denupe_colors.dart';
 import 'screens/home_screen.dart';
@@ -82,14 +82,20 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
-    // La sesión ya fue restaurada por Insforge.initialize().
-    _signedIn = Insforge.instance.auth.currentUser != null;
-    Insforge.instance.auth.onAuthStateChange.listen((state) {
-      if (!mounted) return;
-      setState(() {
-        _signedIn = state.session?.user != null;
-      });
-    });
+    // La sesión ya fue restaurada por DenupeApi.initialize().
+    _signedIn = api.isAuthenticated;
+    api.authStateTick.addListener(_onAuthChanged);
+  }
+
+  void _onAuthChanged() {
+    if (!mounted) return;
+    setState(() => _signedIn = api.isAuthenticated);
+  }
+
+  @override
+  void dispose() {
+    api.authStateTick.removeListener(_onAuthChanged);
+    super.dispose();
   }
 
   @override

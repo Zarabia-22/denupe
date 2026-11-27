@@ -1,14 +1,12 @@
 import 'package:flutter/foundation.dart' show ValueNotifier;
-import 'package:insforge_flutter/insforge_flutter.dart';
 
-import '../config.dart';
 import '../models.dart';
 import 'complaint_realtime.dart';
 import 'denupe_api.dart';
 
 /// Acceso global a los servicios de la app.
-final DenupeApi api = DenupeApi(Insforge.instance);
-final ComplaintRealtime realtime = ComplaintRealtime(Config.baseUrl);
+final DenupeApi api = DenupeApi();
+final ComplaintRealtime realtime = ComplaintRealtime(api);
 
 List<Category>? _categoriesCache;
 
@@ -63,13 +61,9 @@ String authorityNameFromCache(String? id) {
 }
 
 /// Contador que se incrementa cada vez que cambian las notificaciones
-/// (evento realtime, lectura, etc.) para que la pantalla se refresque.
+/// (cambios de estado detectados por sondeo, lectura, etc.) para refrescar la pantalla.
 final ValueNotifier<int> notificationsTick = ValueNotifier<int>(0);
 
 void bumpNotificationsTick() {
   notificationsTick.value++;
 }
-
-/// Token de acceso de la sesión activa (para realtime y llamadas autenticadas).
-String? currentAccessToken() =>
-    Insforge.instance.auth.currentSession?.accessToken;
