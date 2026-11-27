@@ -74,7 +74,7 @@ class DenupeApi {
   Future<void> signOut()async{try{if(_access!=null)await _request('POST','/auth/logout');}finally{await _clear();}}
 
   Future<Profile> myProfile()async{final d=await _request('GET','/auth/me');_setUser(d);final p=Map<String,dynamic>.from(d['profile'] as Map? ?? {});p['id']=d['id'];p['created_at']=d['created_at'];return Profile.fromJson(p);}
-  Future<void> updateProfile({required String fullName,String? dni,String? phone,String? district})async{await _request('PATCH','/auth/me',body:{'full_name':fullName,'dni':dni,'phone':phone,'district':district});}
+  Future<void> updateProfile({required String fullName,String? dni,String? phone,String? district})async{await _request('PATCH','/auth/me',body:{'full_name':fullName,'dni':(dni==null||dni.trim().isEmpty)?null:dni.trim(),'phone':phone,'district':district});}
   Future<List<Category>> categories()async{final d=await _request('GET','/catalogos/categorias');return (d['data'] as List? ?? []).map((x)=>Category.fromJson(Map<String,dynamic>.from(x))).toList();}
   Future<List<Authority>> authorities()async{final d=await _request('GET','/catalogos/autoridades');return (d['data'] as List? ?? []).map((x)=>Authority.fromJson(Map<String,dynamic>.from(x))).toList();}
   Future<List<Map<String,dynamic>>> districts({String? search,int limit=50})async{final d=await _request('GET','/catalogos/distritos',query:{'limit':'$limit',if(search!=null&&search.isNotEmpty)'search':search});return List<Map<String,dynamic>>.from(d['data'] as List? ?? []);}
