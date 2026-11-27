@@ -106,6 +106,15 @@ class DenupeApi {
     final complaints=await myComplaints();for(final c in complaints){final d=await _request('GET','/denuncias/${c.id}/adjuntos');for(final row in List<Map<String,dynamic>>.from(d['data'] as List? ?? [])){if(row['storage_key']==key){final u=await _request('GET','/denuncias/${c.id}/adjuntos/${row['id']}/download-url');return u['download_url'].toString();}}}throw DenupeApiException('No se encontró la evidencia.');
   }
   Future<void> deleteComplaintMedia(ComplaintMedia media)async{await _request('DELETE','/denuncias/${media.complaintId}/adjuntos/${media.id}');}
+  Future<Map<String,dynamic>> aiSuggestCategory({required String title,required String description}) async =>
+      _request('POST','/ia/sugerir-categoria',body:{'titulo':title.trim(),'descripcion':description.trim()});
+  Future<Map<String,dynamic>> aiAvailableEntities({required double latitude,required double longitude}) async =>
+      _request('GET','/ia/entidades/disponibles',query:{'latitud':'$latitude','longitud':'$longitude'});
+  Future<Map<String,dynamic>> aiTerritorialCatalog({required double latitude,required double longitude}) async =>
+      _request('GET','/ia/territorio/catalogo-distrital',query:{'latitud':'$latitude','longitud':'$longitude'});
+  Future<Map<String,dynamic>> aiSuggestEntity(Map<String,dynamic> payload) async =>
+      _request('POST','/ia/sugerir-entidad',body:payload);
+
   Future<List<AppNotification>> notifications()async{final d=await _request('GET','/notificaciones');return (d['data'] as List? ?? []).map((x)=>AppNotification.fromJson(Map<String,dynamic>.from(x))).toList();}
   Future<void> markNotificationRead(String id) async { await _request('PATCH','/notificaciones/$id/leida'); }
   Future<void> markAllNotificationsRead()async{for(final n in (await notifications()).where((x)=>!x.isRead)){await markNotificationRead(n.id);}}
