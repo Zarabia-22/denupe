@@ -1,5 +1,4 @@
 import 'dart:async';
-import '../models.dart';
 import 'denupe_api.dart';
 
 class StatusChangedEvent {
