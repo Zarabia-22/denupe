@@ -282,7 +282,7 @@ class _PasswordRecoveryDialogState extends State<_PasswordRecoveryDialog> {
           ),
         if (_step == 2)
           const Text(
-            'El código es válido. Elige una nueva contraseña de al menos 6 caracteres.',
+            'El código es válido. Elige una nueva contraseña de al menos 8 caracteres.',
             style: TextStyle(height: 1.45),
           ),
         const SizedBox(height: 20),
@@ -337,8 +337,8 @@ class _PasswordRecoveryDialogState extends State<_PasswordRecoveryDialog> {
                     : Icons.visibility_off_outlined),
               ),
             ),
-            validator: (v) => v == null || v.length < 6
-                ? 'Mínimo 6 caracteres'
+            validator: (v) => v == null || v.length < 8
+                ? 'Mínimo 8 caracteres'
                 : null,
           ),
           const SizedBox(height: 16),
