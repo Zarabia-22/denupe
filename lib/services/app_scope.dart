@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart' show ValueNotifier;
-import 'package:insforge_flutter/insforge_flutter.dart';
 
 import '../config.dart';
 import '../models.dart';
@@ -7,7 +6,7 @@ import 'complaint_realtime.dart';
 import 'denupe_api.dart';
 
 /// Acceso global a los servicios de la app.
-final DenupeApi api = DenupeApi(Insforge.instance);
+final DenupeApi api = DenupeApi();
 final ComplaintRealtime realtime = ComplaintRealtime(Config.baseUrl);
 
 List<Category>? _categoriesCache;
@@ -71,5 +70,4 @@ void bumpNotificationsTick() {
 }
 
 /// Token de acceso de la sesión activa (para realtime y llamadas autenticadas).
-String? currentAccessToken() =>
-    Insforge.instance.auth.currentSession?.accessToken;
+String? currentAccessToken() => api.accessToken;
