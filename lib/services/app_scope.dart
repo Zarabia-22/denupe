@@ -67,6 +67,3 @@ final ValueNotifier<int> notificationsTick = ValueNotifier<int>(0);
 void bumpNotificationsTick() {
   notificationsTick.value++;
 }
-
-/// Token de acceso de la sesión activa (para realtime y llamadas autenticadas).
-String? currentAccessToken() => api.accessToken;
