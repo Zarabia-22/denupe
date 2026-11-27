@@ -20,6 +20,7 @@ class DenupeApi {
   final http.Client _client; final FlutterSecureStorage _storage;
   static const _accessKey='denupe_access_token',_refreshKey='denupe_refresh_token';
   String? _access,_refresh; DenupeUser? _user;
+  bool _persistSession=true;
   final ValueNotifier<int> authStateTick=ValueNotifier<int>(0);
   String get _base=>Config.apiBaseUrl.replaceFirst(RegExp(r'/+$'),'');
   DenupeUser? get currentUser=>_user; String? get accessToken=>_access;
@@ -31,14 +32,15 @@ class DenupeApi {
     try{_setUser(await _request('GET','/auth/me'));}on DenupeApiException catch(e){if(e.statusCode==401)await _clear();}catch(_){}
   }
   void _setUser(Map<String,dynamic> d){final u=d['user']??d;if(u is Map&&u['id']!=null&&u['email']!=null)_user=DenupeUser(id:u['id'].toString(),email:u['email'].toString());}
-  Future<void> _save(Map<String,dynamic>d)async{
+  Future<void> _save(Map<String,dynamic>d,{bool? persist})async{
     final a=d['access_token']?.toString(),r=d['refresh_token']?.toString();
     if(a==null||a.isEmpty)throw DenupeApiException('El servidor no devolvió un token.');
-    _access=a;_refresh=r;await _storage.write(key:_accessKey,value:a);
-    if(r!=null)await _storage.write(key:_refreshKey,value:r);
+    _access=a;_refresh=r;_persistSession=persist??_persistSession;
+    if(_persistSession){await _storage.write(key:_accessKey,value:a);if(r!=null)await _storage.write(key:_refreshKey,value:r);}
+    else{await _storage.delete(key:_accessKey);await _storage.delete(key:_refreshKey);}
     _setUser(d);authStateTick.value++;
   }
-  Future<void> _clear()async{_access=null;_refresh=null;_user=null;await _storage.delete(key:_accessKey);await _storage.delete(key:_refreshKey);authStateTick.value++;}
+  Future<void> _clear()async{_access=null;_refresh=null;_user=null;_persistSession=true;await _storage.delete(key:_accessKey);await _storage.delete(key:_refreshKey);authStateTick.value++;}
   Map<String,String> _headers(bool auth){final h={'Accept':'application/json'};if(auth&&_access!=null)h['Authorization']='Bearer $_access';return h;}
   Future<http.Response> _send(String method,String path,{Map<String,dynamic>? body,Map<String,String>? query,bool auth=true}) {
     final uri=Uri.parse('$_base/api/v1$path').replace(queryParameters:query==null||query.isEmpty?null:query);
@@ -61,12 +63,12 @@ class DenupeApi {
     'email_delivery_not_configured':'Falta configurar el envío de correo.','verification_email_delivery_failed':'No se pudo enviar el código.',
     'password_reset_email_delivery_failed':'No se pudo enviar el código de recuperación.',
   };
-  Future<bool> _refreshSession()async{final t=_refresh;if(t==null)return false;try{final d=await _request('POST','/auth/refresh',auth:false,retry:false,body:{'refresh_token':t});await _save(d);return true;}catch(_){await _clear();return false;}}
+  Future<bool> _refreshSession()async{final t=_refresh;if(t==null)return false;try{final d=await _request('POST','/auth/refresh',auth:false,retry:false,body:{'refresh_token':t});await _save(d,persist:_persistSession);return true;}catch(_){await _clear();return false;}}
 
   Future<SignUpResult> signUp({required String email,required String password,String? name})async{await _request('POST','/auth/register',auth:false,body:{'email':email.trim(),'password':password,'full_name':name});return const SignUpResult(requireEmailVerification:true);}
   Future<void> sendVerificationEmail(String email) async { await _request('POST','/auth/email/resend',auth:false,body:{'email':email.trim()}); }
   Future<void> verifyEmail({String? email,required String otp})async{await _save(await _request('POST','/auth/email/verify',auth:false,body:{'email':email?.trim(),'code':otp.trim()}));}
-  Future<void> signIn({required String email,required String password})async{await _save(await _request('POST','/auth/login',auth:false,body:{'email':email.trim(),'password':password}));}
+  Future<void> signIn({required String email,required String password,bool rememberMe=true})async{await _save(await _request('POST','/auth/login',auth:false,body:{'email':email.trim(),'password':password}),persist:rememberMe);}
   Future<void> requestPasswordReset({required String email}) async { await _request('POST','/auth/password-reset/request',auth:false,body:{'email':email.trim()}); }
   Future<void> resendPasswordResetCode({required String email}) async { await _request('POST','/auth/password-reset/resend',auth:false,body:{'email':email.trim()}); }
   Future<String> exchangePasswordResetCode({required String email,required String code})async{final d=await _request('POST','/auth/password-reset/exchange',auth:false,body:{'email':email.trim(),'code':code.trim()});return d['token'].toString();}
