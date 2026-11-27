@@ -199,7 +199,7 @@ void main() {
       dotenv.loadFromString(envString: 'DENUPE_IA_URL=https://api.example.test');
       final client = MockClient((request) async {
         expect(request.method, 'POST');
-        expect(request.url.path, '/api/ia/sugerir-entidad');
+        expect(request.url.path, '/api/v1/ia/sugerir-entidad');
         final body = jsonDecode(request.body) as Map<String, dynamic>;
         expect(body['categoria'], 'Agua y saneamiento');
         expect(body['departamento'], 'Lima');
