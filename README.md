@@ -140,7 +140,7 @@ Ejemplo:
 DENUPE_API_URL=https://denupe-backend.onrender.com
 ```
 
-El backend principal gestiona las llamadas a PostgreSQL, las operaciones de almacenamiento privado en R2 y el proxy autenticado hacia el servicio de IA. No configures URLs ni claves de InsForge en Flutter. Tampoco coloques credenciales SMTP, claves de R2 ni secretos JWT en el archivo `.env` de la aplicación.
+El backend principal gestiona las llamadas a PostgreSQL, las operaciones de almacenamiento privado en R2 y el proxy autenticado hacia el servicio de IA. La aplicación Flutter solo necesita la URL base de este backend; no coloques credenciales SMTP, claves de R2 ni secretos JWT en el archivo `.env` de la aplicación.
 
 Para desarrollo local, utiliza la dirección accesible desde el emulador o dispositivo que estés ejecutando; no sustituyas la URL de producción por una dirección local en una compilación publicada.
 
