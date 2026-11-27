@@ -83,7 +83,7 @@ class Profile {
   final String? autoridadId;
   final DateTime? createdAt;
 
-  bool get isFuncionario => role == 'funcionario';
+  bool get isFuncionario => role == 'funcionario' || role == 'admin';
 
   factory Profile.fromJson(Map<String, dynamic> json) => Profile(
         id: json['id'].toString(),
