@@ -108,8 +108,8 @@ class DenupeApi {
   Future<void> deleteComplaintMedia(ComplaintMedia media)async{await _request('DELETE','/denuncias/${media.complaintId}/adjuntos/${media.id}');}
   Future<Map<String,dynamic>> aiSuggestCategory({required String title,required String description}) async =>
       _request('POST','/ia/sugerir-categoria',body:{'titulo':title.trim(),'descripcion':description.trim()});
-  Future<Map<String,dynamic>> aiAvailableEntities({required double latitude,required double longitude}) async =>
-      _request('GET','/ia/entidades/disponibles',query:{'latitud':'$latitude','longitud':'$longitude'});
+  Future<Map<String,dynamic>> aiAvailableEntities({required String category,required double latitude,required double longitude}) async =>
+      _request('GET','/ia/entidades/disponibles',query:{'categoria':category,'latitud':'$latitude','longitud':'$longitude'});
   Future<Map<String,dynamic>> aiTerritorialCatalog({required double latitude,required double longitude}) async =>
       _request('GET','/ia/territorio/catalogo-distrital',query:{'latitud':'$latitude','longitud':'$longitude'});
   Future<Map<String,dynamic>> aiSuggestEntity(Map<String,dynamic> payload) async =>
