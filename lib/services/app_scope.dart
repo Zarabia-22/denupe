@@ -1,13 +1,12 @@
 import 'package:flutter/foundation.dart' show ValueNotifier;
 
-import '../config.dart';
 import '../models.dart';
 import 'complaint_realtime.dart';
 import 'denupe_api.dart';
 
 /// Acceso global a los servicios de la app.
 final DenupeApi api = DenupeApi();
-final ComplaintRealtime realtime = ComplaintRealtime(Config.apiBaseUrl);
+final ComplaintRealtime realtime = ComplaintRealtime(api);
 
 List<Category>? _categoriesCache;
 
