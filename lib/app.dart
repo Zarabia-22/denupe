@@ -82,7 +82,7 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
-    // La sesión ya fue restaurada por Insforge.initialize().
+    // La sesión ya fue restaurada por DenupeApi.initialize().
     _signedIn = api.isAuthenticated;
     api.authStateTick.addListener(_onAuthChanged);
   }

@@ -1,22 +1,22 @@
-# AGENTS.md
+# Guía del proyecto DenuPe
 
-<!-- INSFORGE:START -->
-## InsForge backend
+## Arquitectura vigente
 
-This project uses [InsForge](https://insforge.dev): an all-in-one, open-source Postgres-based backend (BaaS) that gives this app a database, authentication, file storage, edge functions, realtime, an AI model gateway, and payments through one platform.
+- Aplicación cliente: Flutter y Dart.
+- Backend principal: FastAPI en `https://denupe-backend.onrender.com`.
+- Persistencia: PostgreSQL administrado por Render.
+- Evidencias: Cloudflare R2 privado; el cliente solicita URLs prefirmadas al backend.
+- IA: se consume mediante endpoints proxy autenticados del backend principal.
+- Autenticación: JWT de acceso y refresh rotativo; los tokens se guardan con `flutter_secure_storage`.
+- Seguimiento de estados: sondeo autenticado mediante el cliente REST compartido.
 
-- **Project:** **oss-project** (API base `https://sbb8pb43.us-east.insforge.app`)
-- **Skills:** these InsForge skills are installed for supported coding agents. Reach for them before implementing any InsForge feature instead of guessing the API:
-  - `insforge`: app code with the `@insforge/sdk` client (database CRUD, auth, storage, edge functions, realtime, AI, email, and Stripe payments).
-  - `insforge-cli`: backend and infrastructure via the `insforge` CLI (projects, SQL, migrations, RLS policies, storage buckets, functions, secrets, payment setup, schedules, deploys).
-  - `insforge-debug`: diagnosing failures (SDK/HTTP errors, RLS denials, auth and OAuth issues) and running security or performance audits.
-  - `insforge-integrations`: wiring external auth providers (Clerk, Auth0, WorkOS, Better Auth, etc.) for JWT-based RLS, or the OKX x402 payment facilitator.
-  - `find-skills`: discovering additional skills on demand.
-- **Credentials:** app code reads keys from `.env.local`; the CLI reads `.insforge/project.json`. Never hardcode or commit keys.
+## Reglas de implementación
 
-Key patterns:
-
-- Database inserts take an array: `insert([{ ... }])`.
-- Reference users with `auth.users(id)`; use `auth.uid()` in RLS policies.
-- For storage uploads, persist both the returned `url` and `key`.
-<!-- INSFORGE:END -->
+- Todas las operaciones de autenticación y datos de la aplicación deben pasar por `lib/services/denupe_api.dart`.
+- No conectar Flutter directamente a PostgreSQL, R2 ni al microservicio de IA.
+- No introducir SDK, URL, claves ni credenciales de InsForge en el cliente.
+- No almacenar URLs prefirmadas de R2 como referencias permanentes; persistir y utilizar `storage_key`.
+- Mantener los mensajes de error presentados al usuario libres de detalles internos y secretos.
+- No registrar contraseñas, OTP, tokens, direcciones de correo ni credenciales.
+- Antes de integrar cambios, ejecutar `flutter pub get`, `flutter analyze` y `flutter test`.
+- Mantener los cambios visuales separados de cambios de lógica cuando el trabajo solicitado sea exclusivamente de diseño.

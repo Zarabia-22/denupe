@@ -34,7 +34,7 @@ class AiEntitySuggestion {
 }
 
 /// Proxy de IA del backend principal. El cliente móvil no consume directamente
-/// la URL del microservicio ni depende de credenciales/URLs InsForge.
+/// la URL del microservicio ni necesita credenciales propias.
 class AiEntityService {
   AiEntityService({http.Client? client,DenupeApi? apiClient})
       : _api=apiClient??(client==null?api:DenupeApi(client:client));

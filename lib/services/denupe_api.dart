@@ -23,7 +23,7 @@ class DenupeApi {
   bool _persistSession=true;
   final ValueNotifier<int> authStateTick=ValueNotifier<int>(0);
   String get _base=>Config.apiBaseUrl.replaceFirst(RegExp(r'/+$'),'');
-  DenupeUser? get currentUser=>_user; String? get accessToken=>_access;
+  DenupeUser? get currentUser=>_user;
   bool get isAuthenticated=>_access!=null;
 
   Future<void> initialize() async {

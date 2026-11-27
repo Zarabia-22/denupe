@@ -61,12 +61,9 @@ String authorityNameFromCache(String? id) {
 }
 
 /// Contador que se incrementa cada vez que cambian las notificaciones
-/// (evento realtime, lectura, etc.) para que la pantalla se refresque.
+/// (cambios de estado detectados por sondeo, lectura, etc.) para refrescar la pantalla.
 final ValueNotifier<int> notificationsTick = ValueNotifier<int>(0);
 
 void bumpNotificationsTick() {
   notificationsTick.value++;
 }
-
-/// Token de acceso de la sesión activa (para realtime y llamadas autenticadas).
-String? currentAccessToken() => api.accessToken;

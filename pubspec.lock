@@ -448,22 +448,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.2.2"
-  insforge:
-    dependency: transitive
-    description:
-      name: insforge
-      sha256: "84299f3389bb21aba5c25e0eb35e9186dfaeae0fd97874e648ce9956e64e338d"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.1.0"
-  insforge_flutter:
-    dependency: "direct main"
-    description:
-      name: insforge_flutter
-      sha256: "2d6011e64b43a8eae419b43ee8516221491393fa45f959ac3e9c943f3e9b666e"
-      url: "https://pub.dev"
-    source: hosted
-    version: "0.1.0"
   jni:
     dependency: transitive
     description:
@@ -717,22 +701,6 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
-  socket_io_client:
-    dependency: "direct main"
-    description:
-      name: socket_io_client
-      sha256: f5990ff303d385e7b2150f0e57cca097a8d20c6a2ae0a22cb2d496661ea8ed9b
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.1.6"
-  socket_io_common:
-    dependency: transitive
-    description:
-      name: socket_io_common
-      sha256: "162fbaecbf4bf9a9372a62a341b3550b51dcef2f02f3e5830a297fd48203d45b"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.1.1"
   source_span:
     dependency: transitive
     description:

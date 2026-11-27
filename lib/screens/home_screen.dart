@@ -23,10 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    final token = currentAccessToken();
-    if (token != null) {
-      realtime.connect(token: token);
-    }
+    realtime.connect();
     notificationsTick.addListener(_onNotificationsTick);
     _loadProfile();
   }

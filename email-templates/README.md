@@ -1,27 +1,30 @@
 # Plantillas de correo de autenticación — DenuPe
 
-InsForge renderiza las plantillas con `{{ token }}` para los códigos de 6 dígitos, `{{ link }}` para enlaces y `{{ name }}` / `{{ email }}` con los datos del destinatario. `{{ code }}` no es una variable válida: si se usa, el correo muestra el texto literal.
+Los archivos HTML de este directorio son referencias visuales de los correos de verificación y recuperación de contraseña. **No están conectados directamente a la aplicación Flutter ni se instalan en un proveedor BaaS.**
 
 ## Plantillas incluidas
 
-| Archivo | Plantilla de InsForge | Cuándo se envía | Asunto sugerido |
-|---|---|---|---|
-| `verification-email.html` | `email-verification-code` | Verificación de cuenta nueva | `DenuPe | Confirma tu correo electrónico` |
-| `password-reset-code.html` | `reset-password-code` | Recuperación de contraseña | `DenuPe | Código para restablecer tu contraseña` |
+| Archivo | Uso previsto | Asunto sugerido |
+|---|---|---|
+| `verification-email.html` | Verificación de cuenta nueva mediante código OTP | `DenuPe | Confirma tu correo electrónico` |
+| `password-reset-code.html` | Recuperación de contraseña mediante código OTP | `DenuPe | Código para restablecer tu contraseña` |
 
-## Instalación en InsForge
+## Envío actual
 
-1. Abre `Authentication → Email` en el panel de InsForge.
-2. Si usas SMTP personalizado, habilítalo y guarda la configuración antes de editar las plantillas.
-3. Selecciona la plantilla indicada en la tabla anterior.
-4. Copia el contenido HTML del archivo correspondiente.
-5. Usa `{{ token }}` como variable del código. No la renombres.
-6. Guarda y envía un correo de prueba para verificar el código real en Gmail y Outlook.
+El backend FastAPI principal gestiona el envío de correos mediante SMTP. Flutter solicita las operaciones a los endpoints autenticados o públicos correspondientes:
 
-## Notas
+- `POST /api/v1/auth/register`
+- `POST /api/v1/auth/email/resend`
+- `POST /api/v1/auth/email/verify`
+- `POST /api/v1/auth/password-reset/request`
+- `POST /api/v1/auth/password-reset/resend`
+- `POST /api/v1/auth/password-reset/exchange`
+- `POST /api/v1/auth/password-reset/confirm`
 
-- El backend usa actualmente las plantillas predeterminadas en inglés; estos archivos son la versión personalizada de DenuPe.
-- La verificación y el reseteo están configurados en modo `code`, por eso no se usa `{{ link }}`.
-- InsForge aplica un intervalo mínimo de 60 segundos por destinatario; los reenvíos dentro de ese plazo devuelven HTTP 429.
-- Se usa HTML con tablas y estilos inline para mejorar compatibilidad con clientes de correo.
-- No se fija un tiempo de expiración concreto porque debe coincidir con el configurado en InsForge.
+La configuración SMTP se mantiene exclusivamente en las variables de entorno del servicio backend. No debe copiarse ninguna credencial SMTP al proyecto Flutter.
+
+## Personalización futura
+
+Si se desea utilizar el diseño HTML de estos archivos en los correos reales, debe adaptarse al motor de plantillas del backend y probarse allí. Los nombres de variables, el formato del OTP y los tiempos de expiración deben coincidir con la implementación vigente del backend; no se deben asumir variables de plantilla de un proveedor anterior.
+
+No se debe modificar ni eliminar la configuración histórica de InsForge desde este directorio: el cliente Flutter ya no depende de ese servicio.
