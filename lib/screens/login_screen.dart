@@ -35,6 +35,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await api.signIn(
         email: _email.text.trim(),
         password: _password.text,
+        rememberMe: _remember,
       );
       // El AuthGate detecta el inicio de sesión vía onAuthStateChange.
     } on DenupeApiException catch (e) {
