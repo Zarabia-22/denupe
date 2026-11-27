@@ -83,7 +83,7 @@ Esta auditoría se basa en el código fuente y los contratos publicados en los r
 
 ### Resultado de CI observado
 
-La primera ejecución de Flutter CI detectó errores de tipos y un import no usado. Los errores de tipos se corrigieron; el análisis posterior pasó, pero la ejecución se canceló por concurrencia de commits y la siguiente ejecución detectó un import no usado, ya eliminado. Falta que una ejecución final complete tanto `flutter analyze` como `flutter test`.
+Flutter CI quedó aprobado: `flutter analyze --no-fatal-infos` y `flutter test` finalizaron correctamente en [run 45943132594](https://github.com/Zarabia-22/denupe/actions/runs/45943132594). La ejecución inicial había detectado errores de tipos y un import no usado; fueron corregidos antes de la ejecución aprobada.
 
 ### Pendientes de validación
 
