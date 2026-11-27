@@ -1,3 +1,4 @@
+import 'package:http/http.dart' as http;
 import '../services/app_scope.dart';
 import '../services/denupe_api.dart';
 
@@ -35,9 +36,12 @@ class AiEntitySuggestion {
 /// Proxy de IA del backend principal. El cliente móvil no consume directamente
 /// la URL del microservicio ni depende de credenciales/URLs InsForge.
 class AiEntityService {
+  AiEntityService({http.Client? client,DenupeApi? apiClient})
+      : _api=apiClient??(client==null?api:DenupeApi(client:client));
+  final DenupeApi _api;
   Future<List<AiPublicEntity>> listarEntidadesDisponibles({required String categoria,required double latitud,required double longitud}) async {
     try {
-      final data=await api.aiAvailableEntities(category:categoria,latitude:latitud,longitude:longitud);
+      final data=await _api.aiAvailableEntities(category:categoria,latitude:latitud,longitude:longitud);
       final rows=data['entidades'];
       if(rows is! List)throw const FormatException('Respuesta inválida del catálogo');
       return rows.whereType<Map>().map((x)=>AiPublicEntity.fromJson(Map<String,dynamic>.from(x))).toList();
@@ -47,7 +51,7 @@ class AiEntityService {
 
   Future<List<AiPublicEntity>> listarCatalogoTerritorial({required double latitud,required double longitud}) async {
     try {
-      final data=await api.aiTerritorialCatalog(latitude:latitud,longitude:longitud);
+      final data=await _api.aiTerritorialCatalog(latitude:latitud,longitude:longitud);
       final rows=data['categorias'];
       if(rows is! List)throw const FormatException('Respuesta inválida del catálogo territorial');
       final area=<String,String>{
@@ -81,7 +85,7 @@ class AiEntityService {
     double? latitud,double? longitud,
   }) async {
     try {
-      final data=await api.aiSuggestEntity({
+      final data=await _api.aiSuggestEntity({
         'categoria':categoria,'departamento':departamento,'provincia':provincia,
         'distrito':distrito,'titulo':titulo.trim(),'descripcion':descripcion.trim(),
         if(latitud!=null&&longitud!=null)'latitud':latitud,
