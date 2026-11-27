@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'package:insforge_flutter/insforge_flutter.dart';
+
 
 import 'app.dart';
-import 'config.dart';
+import 'services/app_scope.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,16 +25,7 @@ class _DenuPeBootstrapState extends State<DenuPeBootstrap> {
 
   Future<void> _bootstrap() async {
     await dotenv.load(fileName: '.env');
-    try {
-      await Insforge.initialize(url: Config.baseUrl, anonKey: Config.anonKey);
-    } catch (_) {
-      // Sesión persistida ilegible (Keystore corrupta tras reinstalar, respaldo
-      // restaurado, etc.): se limpia el almacenamiento seguro y se reintenta.
-      try {
-        await const FlutterSecureStorage().deleteAll();
-      } catch (_) {}
-      await Insforge.initialize(url: Config.baseUrl, anonKey: Config.anonKey);
-    }
+    await api.initialize();
   }
 
   @override
