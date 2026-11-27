@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Zarabia-22/denupe/releases"><img src="https://img.shields.io/badge/versi%C3%B3n-1.5.0%2B15-2457A7" alt="Versión 1.5.0+15" /></a>
+  <a href="https://github.com/Zarabia-22/denupe/releases"><img src="https://img.shields.io/badge/versi%C3%B3n-1.6.0%2B16-2457A7" alt="Versión 1.6.0+16" /></a>
   <img src="https://img.shields.io/badge/Flutter-Dart%20%5E3.13.4-02569B?logo=flutter&logoColor=white" alt="Flutter y Dart" />
   <img src="https://img.shields.io/badge/plataforma-Android%20%7C%20Web-0F766E" alt="Android y Web" />
   <a href="https://github.com/Zarabia-22/denupe/issues"><img src="https://img.shields.io/badge/soporte-GitHub%20Issues-orange" alt="Soporte en GitHub Issues" /></a>
@@ -73,7 +73,7 @@ El repositorio no contiene actualmente capturas de pantallas ni un GIF de demost
 | Cloudflare R2 | Almacenamiento privado de fotografías y videos mediante URLs prefirmadas. |
 | JWT | Autenticación con tokens de acceso y refresh rotativo. |
 | HTTP y JSON | Comunicación REST entre Flutter y el backend. |
-| SMTP | Envío de códigos de verificación y recuperación desde el backend. |
+| Gmail API (OAuth 2.0 sobre HTTPS) | Envío de códigos de verificación y recuperación desde el backend. |
 | Backend de IA | Recomendaciones de categoría y entidad consumidas mediante proxy autenticado. |
 | Geolocator | Obtención de coordenadas con permiso del usuario. |
 | Image Picker | Selección de fotografías y videos. |
@@ -140,11 +140,11 @@ Ejemplo:
 DENUPE_API_URL=https://denupe-backend.onrender.com
 ```
 
-El backend principal gestiona las llamadas a PostgreSQL, las operaciones de almacenamiento privado en R2 y el proxy autenticado hacia el servicio de IA. La aplicación Flutter solo necesita la URL base de este backend; no coloques credenciales SMTP, claves de R2 ni secretos JWT en el archivo `.env` de la aplicación.
+El backend principal gestiona las llamadas a PostgreSQL, las operaciones de almacenamiento privado en R2 y el proxy autenticado hacia el servicio de IA. La aplicación Flutter solo necesita la URL base de este backend; no coloques credenciales OAuth de Gmail, claves de R2 ni secretos JWT en el archivo `.env` de la aplicación.
 
 Para desarrollo local, utiliza la dirección accesible desde el emulador o dispositivo que estés ejecutando; no sustituyas la URL de producción por una dirección local en una compilación publicada.
 
-**Seguridad:** no subas el archivo `.env`, tokens ni credenciales. Los secretos de SMTP, JWT y Cloudflare R2 pertenecen exclusivamente a las variables de entorno del backend.
+**Seguridad:** no subas el archivo `.env`, tokens ni credenciales. Las credenciales OAuth de Gmail, JWT y Cloudflare R2 pertenecen exclusivamente a las variables de entorno del backend.
 
 ### 4. Instalar dependencias
 
