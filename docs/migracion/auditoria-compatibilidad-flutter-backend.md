@@ -30,7 +30,7 @@ La aplicación Flutter debe consumir el backend principal `https://denupe-backen
 | Evidencias | Sube/borra objetos de `complaint-media` y escribe filas en `adjuntos_denuncia`. | Flujo R2 upload-url → PUT → confirm; URLs de descarga por adjunto y DELETE propietario implementados. |
 | Notificaciones | Consulta y actualiza `notificaciones` directamente. | `GET /api/v1/notificaciones` y `PATCH /api/v1/notificaciones/{id}/leida`. |
 | Tiempo real | Socket.IO conectado a InsForge con `realtime:subscribe`. | Reemplazado por polling autenticado cada 20 segundos mediante el mismo cliente HTTP, con refresh automático. |
-| IA | Servicios Flutter consultan directamente la URL del backend IA. | Mantener el backend IA intacto; migrar a proxy del backend principal cuando estén expuestos y validados todos los contratos IA. |
+| IA | Servicios Flutter consumen el proxy autenticado del backend principal para categoría, entidad y territorio. | Backend IA permanece intacto; Flutter ya consume proxies autenticados del backend principal para sugerir categoría, listar entidades, catálogo territorial y sugerir entidad. |
 
 ## Incompatibilidades de contrato encontradas
 
@@ -90,5 +90,5 @@ La primera ejecución de Flutter CI detectó errores de tipos y un import no usa
 1. CI verde final en Flutter.
 2. SMTP real en Render y prueba de registro/verificación/recuperación.
 3. E2E del cliente Flutter en dispositivo: login, perfil, catálogos, crear denuncia, R2 foto/vídeo, descarga, eliminación, notificaciones y permisos de dos autoridades.
-4. Proxies de IA: categoría y operaciones de entidad/territorio aún deben inventariarse y migrarse sin modificar el repositorio IA.
+4. Proxies de IA: implementar pruebas E2E contra el backend IA desplegado.
 5. Retirar InsForge SDK, claves y variables solo después de aprobar regresión integral y comprobar que el servicio IA conserva su dependencia independiente.
