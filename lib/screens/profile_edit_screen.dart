@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:insforge_flutter/insforge_flutter.dart' hide Profile;
 
 import '../models.dart';
 import '../services/app_scope.dart';
+import '../services/denupe_api.dart';
 
 /// Formulario de edición del perfil propio (nombre, DNI, teléfono, distrito).
 /// Devuelve `true` al pop si hubo cambios guardados.
@@ -54,7 +54,7 @@ class _ProfileEditScreenState extends State<ProfileEditScreen> {
       );
       if (!mounted) return;
       Navigator.of(context).pop(true);
-    } on InsforgeException catch (e) {
+    } on DenupeApiException catch (e) {
       _showMessage(e.message);
     } catch (_) {
       _showMessage('Error de conexión');

@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../theme/denupe_colors.dart';
 import '../widgets/location_preview.dart';
-import 'package:insforge_flutter/insforge_flutter.dart';
 
 import '../models.dart';
 import '../services/app_scope.dart';
+import '../services/denupe_api.dart';
 import '../services/ai_entity_service.dart';
 import '../services/entity_display_name.dart';
 
@@ -379,7 +379,7 @@ class _ComplaintConfirmationScreenState
       }
       if (!mounted) return;
       Navigator.of(context).pop(true);
-    } on InsforgeException catch (e) {
+    } on DenupeApiException catch (e) {
       if (!mounted) return;
       setState(() => _confirming = false);
       _showMessage(e.message);
