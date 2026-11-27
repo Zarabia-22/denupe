@@ -64,13 +64,13 @@ class DenupeApi {
   Future<bool> _refreshSession()async{final t=_refresh;if(t==null)return false;try{final d=await _request('POST','/auth/refresh',auth:false,retry:false,body:{'refresh_token':t});await _save(d);return true;}catch(_){await _clear();return false;}}
 
   Future<SignUpResult> signUp({required String email,required String password,String? name})async{await _request('POST','/auth/register',auth:false,body:{'email':email.trim(),'password':password,'full_name':name});return const SignUpResult(requireEmailVerification:true);}
-  Future<void> sendVerificationEmail(String email)async{await _request('POST','/auth/email/resend',auth:false,body:{'email':email.trim()});}
+  Future<void> sendVerificationEmail(String email) async { await _request('POST','/auth/email/resend',auth:false,body:{'email':email.trim()}); }
   Future<void> verifyEmail({String? email,required String otp})async{await _save(await _request('POST','/auth/email/verify',auth:false,body:{'email':email?.trim(),'code':otp.trim()}));}
   Future<void> signIn({required String email,required String password})async{await _save(await _request('POST','/auth/login',auth:false,body:{'email':email.trim(),'password':password}));}
-  Future<void> requestPasswordReset({required String email})async{await _request('POST','/auth/password-reset/request',auth:false,body:{'email':email.trim()});}
-  Future<void> resendPasswordResetCode({required String email})async{await _request('POST','/auth/password-reset/resend',auth:false,body:{'email':email.trim()});}
+  Future<void> requestPasswordReset({required String email}) async { await _request('POST','/auth/password-reset/request',auth:false,body:{'email':email.trim()}); }
+  Future<void> resendPasswordResetCode({required String email}) async { await _request('POST','/auth/password-reset/resend',auth:false,body:{'email':email.trim()}); }
   Future<String> exchangePasswordResetCode({required String email,required String code})async{final d=await _request('POST','/auth/password-reset/exchange',auth:false,body:{'email':email.trim(),'code':code.trim()});return d['token'].toString();}
-  Future<void> resetPassword({required String token,required String newPassword})async{await _request('POST','/auth/password-reset/confirm',auth:false,body:{'token':token,'new_password':newPassword});}
+  Future<void> resetPassword({required String token,required String newPassword}) async { await _request('POST','/auth/password-reset/confirm',auth:false,body:{'token':token,'new_password':newPassword}); }
   Future<void> signOut()async{try{if(_access!=null)await _request('POST','/auth/logout');}finally{await _clear();}}
 
   Future<Profile> myProfile()async{final d=await _request('GET','/auth/me');_setUser(d);final p=Map<String,dynamic>.from(d['profile'] as Map? ?? {});p['id']=d['id'];p['created_at']=d['created_at'];return Profile.fromJson(p);}
@@ -86,7 +86,7 @@ class DenupeApi {
     final d=await _request('POST','/denuncias',body:{'category_id':categoryId,'title':title,'description':description,'address':address,'latitude':latitude,'longitude':longitude,'autoridad_id':autoridadId,'entidad_publica_id':entidadPublicaId,'entidad_publica_nombre':entidadPublicaNombre,'ruta_territorial_code':rutaTerritorialCode,'district_ubigeo':districtUbigeo,'denunciante_nombre':denuncianteNombre,'denunciante_dni':denuncianteDni,'denunciante_email':denuncianteEmail,'denunciante_telefono':denuncianteTelefono});return Complaint.fromJson(d);
   }
   Future<Complaint?> complaintById(String id)async{try{return Complaint.fromJson(await _request('GET','/denuncias/$id'));}on DenupeApiException catch(e){if(e.statusCode==404)return null;rethrow;}}
-  Future<void> updateComplaintStatus({required String complaintId,required String newStatus,String? note})async{await _request('PATCH','/denuncias/$complaintId/estado',body:{'status':newStatus,'note':note});}
+  Future<void> updateComplaintStatus({required String complaintId,required String newStatus,String? note}) async { await _request('PATCH','/denuncias/$complaintId/estado',body:{'status':newStatus,'note':note}); }
   Future<List<StatusHistory>> complaintHistory(String id)async{final d=await _request('GET','/denuncias/$id/historial');return (d['data'] as List? ?? []).map((x)=>StatusHistory.fromJson(Map<String,dynamic>.from(x))).toList();}
 
   Future<ComplaintMedia> uploadComplaintMedia({required String complaintId,required Uint8List bytes,required String filename,required String contentType,required String mediaType})async{
@@ -105,7 +105,7 @@ class DenupeApi {
   }
   Future<void> deleteComplaintMedia(ComplaintMedia media)async{await _request('DELETE','/denuncias/${media.complaintId}/adjuntos/${media.id}');}
   Future<List<AppNotification>> notifications()async{final d=await _request('GET','/notificaciones');return (d['data'] as List? ?? []).map((x)=>AppNotification.fromJson(Map<String,dynamic>.from(x))).toList();}
-  Future<void> markNotificationRead(String id)async{await _request('PATCH','/notificaciones/$id/leida');}
+  Future<void> markNotificationRead(String id) async { await _request('PATCH','/notificaciones/$id/leida'); }
   Future<void> markAllNotificationsRead()async{for(final n in (await notifications()).where((x)=>!x.isRead)){await markNotificationRead(n.id);}}
   Future<int> unreadNotificationsCount()async=>(await notifications()).where((x)=>!x.isRead).length;
   void dispose()=>_client.close();
