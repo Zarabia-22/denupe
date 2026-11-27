@@ -24,10 +24,4 @@ abstract final class Config {
     return value;
   }
 
-  /// URL del microservicio FastAPI. No usa un endpoint de pruebas por defecto:
-  /// cada entorno debe declarar explícitamente DENUPE_IA_URL.
-  static String? get aiBaseUrl {
-    final value = dotenv.env['DENUPE_IA_URL']?.trim();
-    return (value == null || value.isEmpty) ? null : value;
-  }
 }
