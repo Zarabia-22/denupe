@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:insforge_flutter/insforge_flutter.dart';
 
 import '../services/app_scope.dart';
+import '../services/denupe_api.dart';
 import '../theme/denupe_colors.dart';
 import 'register_screen.dart';
 
@@ -37,7 +37,7 @@ class _LoginScreenState extends State<LoginScreen> {
         password: _password.text,
       );
       // El AuthGate detecta el inicio de sesión vía onAuthStateChange.
-    } on InsforgeException catch (e) {
+    } on DenupeApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text(e.message)));
@@ -193,7 +193,7 @@ class _PasswordRecoveryDialogState extends State<_PasswordRecoveryDialog> {
   }
 
   String _errorMessage(Object error) =>
-      error is InsforgeException ? error.message : 'Error de conexión. Intenta nuevamente.';
+      error is DenupeApiException ? error.message : 'Error de conexión. Intenta nuevamente.';
 
   Future<void> _sendCode({bool stayOnStep = false}) async {
     if (!stayOnStep && !_formKey.currentState!.validate()) return;
