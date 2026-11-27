@@ -35,9 +35,9 @@ class AiEntitySuggestion {
 /// Proxy de IA del backend principal. El cliente móvil no consume directamente
 /// la URL del microservicio ni depende de credenciales/URLs InsForge.
 class AiEntityService {
-  Future<List<AiPublicEntity>> listarEntidadesDisponibles({required double latitud,required double longitud}) async {
+  Future<List<AiPublicEntity>> listarEntidadesDisponibles({required String categoria,required double latitud,required double longitud}) async {
     try {
-      final data=await api.aiAvailableEntities(latitude:latitud,longitude:longitud);
+      final data=await api.aiAvailableEntities(category:categoria,latitude:latitud,longitude:longitud);
       final rows=data['entidades'];
       if(rows is! List)throw const FormatException('Respuesta inválida del catálogo');
       return rows.whereType<Map>().map((x)=>AiPublicEntity.fromJson(Map<String,dynamic>.from(x))).toList();
