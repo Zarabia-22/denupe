@@ -7,7 +7,7 @@ import 'denupe_api.dart';
 
 /// Acceso global a los servicios de la app.
 final DenupeApi api = DenupeApi();
-final ComplaintRealtime realtime = ComplaintRealtime(Config.baseUrl);
+final ComplaintRealtime realtime = ComplaintRealtime(Config.apiBaseUrl);
 
 List<Category>? _categoriesCache;
 
