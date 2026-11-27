@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/Zarabia-22/denupe/releases"><img src="https://img.shields.io/badge/versi%C3%B3n-1.4.4%2B10-2457A7" alt="Versión 1.4.4+10" /></a>
+  <a href="https://github.com/Zarabia-22/denupe/releases"><img src="https://img.shields.io/badge/versi%C3%B3n-1.5.0%2B15-2457A7" alt="Versión 1.5.0+15" /></a>
   <img src="https://img.shields.io/badge/Flutter-Dart%20%5E3.13.4-02569B?logo=flutter&logoColor=white" alt="Flutter y Dart" />
   <img src="https://img.shields.io/badge/plataforma-Android%20%7C%20Web-0F766E" alt="Android y Web" />
   <a href="https://github.com/Zarabia-22/denupe/issues"><img src="https://img.shields.io/badge/soporte-GitHub%20Issues-orange" alt="Soporte en GitHub Issues" /></a>
@@ -68,16 +68,17 @@ El repositorio no contiene actualmente capturas de pantallas ni un GIF de demost
 | Tecnología | Uso |
 |---|---|
 | Dart y Flutter | Aplicación móvil y ejecución web. |
-| InsForge Flutter SDK | Integración de la aplicación con los servicios de InsForge. |
-| InsForge y PostgreSQL | Autenticación, persistencia, datos y funciones RPC. |
-| Python y FastAPI | API independiente de recomendaciones y resolución territorial. |
-| scikit-learn | Procesamiento de texto y clasificación de categorías en el backend. |
-| HTTP y JSON | Comunicación entre la aplicación y la API. |
-| Socket.IO | Eventos y actualizaciones en tiempo real. |
+| Python y FastAPI | Backend principal: autenticación, perfiles, denuncias, catálogos, permisos y notificaciones. |
+| PostgreSQL en Render | Persistencia relacional del backend principal. |
+| Cloudflare R2 | Almacenamiento privado de fotografías y videos mediante URLs prefirmadas. |
+| JWT | Autenticación con tokens de acceso y refresh rotativo. |
+| HTTP y JSON | Comunicación REST entre Flutter y el backend. |
+| SMTP | Envío de códigos de verificación y recuperación desde el backend. |
+| Backend de IA | Recomendaciones de categoría y entidad consumidas mediante proxy autenticado. |
 | Geolocator | Obtención de coordenadas con permiso del usuario. |
 | Image Picker | Selección de fotografías y videos. |
 | flutter_dotenv | Configuración mediante variables de entorno. |
-| flutter_secure_storage | Almacenamiento seguro compatible con la plataforma. |
+| flutter_secure_storage | Almacenamiento seguro de tokens en el dispositivo. |
 | url_launcher | Apertura de enlaces externos. |
 
 ## Prerrequisitos
@@ -88,8 +89,7 @@ Para desarrollar y ejecutar el proyecto localmente:
 - Flutter SDK y Dart compatibles con la restricción declarada en `pubspec.yaml`: Dart `^3.13.4`.
 - Android Studio y Android SDK, o un dispositivo Android para ejecutar la aplicación móvil.
 - Google Chrome si se desea ejecutar la versión web.
-- Un proyecto de InsForge con su URL y clave pública/anon.
-- Acceso a una instancia del backend FastAPI para probar el catálogo territorial y las funciones de IA.
+- Acceso a Internet para consumir el backend principal desplegado en Render.
 - Visual Studio Code con las extensiones Flutter y Dart (opcional).
 
 Verifica tu instalación:
@@ -128,25 +128,23 @@ cp .env.example .env
 
 ### 3. Configurar las variables
 
-Edita el archivo `.env`:
+Edita el archivo `.env`. La aplicación Flutter solo necesita la URL del backend principal:
 
 | Variable | Descripción |
 |---|---|
-| `INSFORGE_URL` | URL base del proyecto InsForge. |
-| `INSFORGE_ANON_KEY` | Clave pública/anon para las operaciones cliente autorizadas por las políticas de acceso. |
-| `DENUPE_IA_URL` | URL base del backend FastAPI, sin barra final. |
+| `DENUPE_API_URL` | URL base del backend FastAPI principal, sin barra final. Por defecto se utiliza el servicio de producción en Render. |
 
-Ejemplo ilustrativo; reemplaza los valores por los de tu entorno:
+Ejemplo:
 
 ```dotenv
-INSFORGE_URL=https://tu-proyecto.us-east.insforge.app
-INSFORGE_ANON_KEY=tu_clave_publica
-DENUPE_IA_URL=https://tu-backend.onrender.com
+DENUPE_API_URL=https://denupe-backend.onrender.com
 ```
 
-Para acceder desde el emulador Android a un backend que corre en el equipo anfitrión, normalmente se utiliza `http://10.0.2.2:8000`. En un dispositivo físico utiliza una dirección accesible desde ese dispositivo.
+El backend principal gestiona las llamadas a PostgreSQL, las operaciones de almacenamiento privado en R2 y el proxy autenticado hacia el servicio de IA. No configures URLs ni claves de InsForge en Flutter. Tampoco coloques credenciales SMTP, claves de R2 ni secretos JWT en el archivo `.env` de la aplicación.
 
-**Seguridad:** no subas el archivo `.env`, tokens ni credenciales administrativas. La clave anon no reemplaza las políticas de autorización de InsForge. No configures una URL de pruebas como si fuera producción.
+Para desarrollo local, utiliza la dirección accesible desde el emulador o dispositivo que estés ejecutando; no sustituyas la URL de producción por una dirección local en una compilación publicada.
+
+**Seguridad:** no subas el archivo `.env`, tokens ni credenciales. Los secretos de SMTP, JWT y Cloudflare R2 pertenecen exclusivamente a las variables de entorno del backend.
 
 ### 4. Instalar dependencias
 
@@ -199,24 +197,38 @@ El APK se genera en:
 build/app/outputs/flutter-apk/app-release.apk
 ```
 
-### Comprobar el backend de IA
+### Comprobar el backend principal
 
-Con el backend configurado en `DENUPE_IA_URL`, puedes comprobar su disponibilidad:
+La aplicación consume el backend FastAPI principal:
 
 ```bash
-curl https://tu-backend.onrender.com/health
+curl https://denupe-backend.onrender.com/health
+curl https://denupe-backend.onrender.com/health/database
 ```
 
-La aplicación integra estos endpoints del backend:
+Las operaciones de la aplicación se realizan bajo el prefijo `/api/v1`:
 
 | Método | Endpoint | Propósito |
 |---|---|---|
-| `GET` | `/health` | Comprobar disponibilidad del servicio. |
-| `POST` | `/api/ia/sugerir-categoria` | Solicitar una categoría sugerida a partir del texto de la denuncia. |
-| `GET` | `/api/entidades/disponibles` | Consultar entidades disponibles según los parámetros territoriales y de categoría. |
-| `POST` | `/api/ia/sugerir-entidad` | Solicitar una recomendación de entidad o una abstención. |
+| `POST` | `/auth/register` | Registrar una cuenta y solicitar verificación por correo. |
+| `POST` | `/auth/email/verify` | Verificar el correo mediante OTP. |
+| `POST` | `/auth/login` | Iniciar sesión y obtener JWT. |
+| `POST` | `/auth/refresh` | Renovar la sesión mediante refresh token rotativo. |
+| `GET/PATCH` | `/auth/me` | Consultar y actualizar el perfil propio. |
+| `GET` | `/catalogos/categorias` | Consultar categorías de denuncia. |
+| `GET` | `/catalogos/autoridades` | Consultar autoridades receptoras. |
+| `GET` | `/denuncias` | Consultar denuncias permitidas para el usuario. |
+| `POST` | `/denuncias` | Registrar una denuncia. |
+| `POST` | `/denuncias/{id}/adjuntos/upload-url` | Solicitar autorización de carga a R2. |
+| `POST` | `/denuncias/{id}/adjuntos/confirm` | Confirmar y registrar una evidencia. |
+| `GET` | `/denuncias/{id}/adjuntos/{attachment_id}/download-url` | Obtener una URL temporal de descarga. |
+| `GET` | `/notificaciones` | Consultar notificaciones del usuario. |
+| `POST` | `/ia/sugerir-categoria` | Solicitar una categoría sugerida mediante el proxy autenticado de IA. |
+| `GET` | `/ia/entidades/disponibles` | Consultar opciones territoriales y entidades disponibles. |
+| `GET` | `/ia/territorio/catalogo-distrital` | Consultar el catálogo territorial. |
+| `POST` | `/ia/sugerir-entidad` | Solicitar una recomendación de entidad o una abstención. |
 
-Consulta el [README del backend](https://github.com/Zarabia-22/denupe-ia-backend) para conocer los esquemas de petición y respuesta vigentes de cada endpoint.
+Los endpoints de negocio requieren el JWT cuando corresponde. Flutter no accede directamente a PostgreSQL, Cloudflare R2 ni al microservicio de IA. Para evidencias, el backend autoriza la operación con URLs prefirmadas y mantiene privado el bucket.
 
 ### Flujo principal en la aplicación
 
@@ -271,38 +283,50 @@ Actualmente no se ha identificado un archivo `LICENSE` en la raíz del repositor
 
 ## Arquitectura y estructura
 
-DenuPe está organizada en una aplicación Flutter y servicios backend desacoplados:
+La aplicación utiliza una arquitectura cliente-servidor desacoplada:
 
 ```text
 Aplicación Flutter
-   |-- InsForge SDK
-   |     |-- Autenticación
-   |     |-- PostgreSQL / RPC
-   |     |-- Datos y almacenamiento
    |
-   |-- HTTP REST
-   |     |-- Backend FastAPI
-   |           |-- Sugerencia de categoría
-   |           |-- Catálogo y resolución territorial
-   |           |-- Recomendación de entidad
+   | HTTPS / REST / JSON + JWT
+   v
+Backend principal FastAPI (Render)
+   |-- Autenticación y sesiones JWT
+   |-- Perfiles, permisos y catálogos
+   |-- Denuncias, historial y notificaciones
+   |-- Proxy autenticado de IA
+   |-- Autorización de evidencias
    |
-   |-- Socket.IO
-         |-- Eventos y actualizaciones en tiempo real
+   |-- PostgreSQL (Render)
+   |
+   |-- URLs prefirmadas
+          |
+          v
+      Cloudflare R2 privado
+
+Backend principal
+   |-- SMTP para verificación y recuperación
+   |-- Microservicio de IA para clasificación y resolución territorial
+
+Flutter consulta cambios de estado mediante sondeo REST autenticado.
 ```
 
 ### Directorios y componentes
 
 | Ruta | Responsabilidad |
 |---|---|
-| `lib/config.dart` | Lectura y validación de configuración. |
-| `lib/models.dart` y `lib/models/` | Modelos y estructuras de datos. |
-| `lib/screens/` | Pantallas de autenticación, denuncias, detalle y paneles. |
-| `lib/services/` | Integración con InsForge, API de IA y eventos en tiempo real. |
+| `lib/config.dart` | URL del backend principal. |
+| `lib/models.dart` | Modelos de categorías, perfiles, denuncias, evidencias e historial. |
+| `lib/screens/` | Pantallas de autenticación, denuncias, detalle, notificaciones y paneles. |
+| `lib/services/denupe_api.dart` | Cliente REST, JWT, refresh, perfiles, denuncias, R2 y notificaciones. |
+| `lib/services/complaint_realtime.dart` | Seguimiento de cambios mediante sondeo autenticado. |
+| `lib/services/ai_*.dart` | Adaptadores del proxy de IA del backend principal. |
 | `lib/theme/` | Colores y tema visual. |
 | `lib/widgets/` | Componentes reutilizables. |
 | `assets/` | Logotipos e imágenes. |
 | `test/` | Pruebas automatizadas. |
-| `migrations/` | Migraciones SQL para InsForge. |
+
+El esquema de base de datos y sus migraciones Alembic se mantienen en el repositorio del backend [denupe-backend](https://github.com/Zarabia-22/denupe-backend).
 
 ### Catálogo territorial
 
