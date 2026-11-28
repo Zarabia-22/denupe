@@ -86,7 +86,8 @@ jobs:
         run: flutter pub get
 
       - name: Analizar código
-        run: flutter analyze
+        # Mantiene el mismo criterio que Flutter CI: infos no bloquean el release.
+        run: flutter analyze --no-fatal-infos
 
       - name: Ejecutar pruebas
         run: flutter test --coverage
