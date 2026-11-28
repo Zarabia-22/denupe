@@ -137,21 +137,28 @@ def run():
     record("Historial inicial recibido",
            isinstance(history, list) and any(x.get("status") == "recibida" for x in history))
 
-    # Exercise presigned storage upload used by Flutter.
-    png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4S8AAAAASUVORK5CYII=")
-    up = body(call("POST", f"/denuncias/{COMPLAINT_ID}/adjuntos/upload-url",
-                   json={"filename": "e2e-synthetic.png", "mime_type": "image/png", "size_bytes": len(png)}))
-    url, key, headers = up.get("upload_url"), up.get("storage_key"), up.get("headers")
-    if not url or not key or not isinstance(headers, dict): raise AssertionError("Contrato upload-url incompleto: " + str(up)[:600])
-    if urlparse(url).scheme != "https": raise AssertionError("La URL de subida no usa HTTPS.")
-    put = S.put(url, headers={str(k): str(v) for k, v in headers.items()}, data=png, timeout=60)
-    if put.status_code not in (200, 201, 204): raise AssertionError(f"PUT de evidencia HTTP {put.status_code}: {put.text[:300]}")
-    confirmed = body(call("POST", f"/denuncias/{COMPLAINT_ID}/adjuntos/confirm", json={"storage_key": key}))
-    record("Evidencia: URL presignada + PUT + confirmación",
-           bool(confirmed.get("id") or confirmed.get("storage_key")), key)
-    attachments = body(call("GET", f"/denuncias/{COMPLAINT_ID}/adjuntos"))
-    record("Evidencia asociada a la denuncia",
-           isinstance(attachments, list) and any(x.get("storage_key") == key for x in attachments))
+    # Exercise the exact presigned storage flow used by Flutter. A failure is recorded,
+    # but the remaining business-rule checks still run and appear in the report.
+    try:
+        png = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j4S8AAAAASUVORK5CYII=")
+        up = body(call("POST", f"/denuncias/{COMPLAINT_ID}/adjuntos/upload-url",
+                       json={"filename": "e2e-synthetic.png", "mime_type": "image/png", "size_bytes": len(png)}))
+        url, key, headers = up.get("upload_url"), up.get("storage_key"), up.get("headers")
+        if not url or not key or not isinstance(headers, dict):
+            raise AssertionError("Contrato upload-url incompleto: " + str(up)[:600])
+        if urlparse(url).scheme != "https": raise AssertionError("La URL de subida no usa HTTPS.")
+        put = S.put(url, headers={str(k): str(v) for k, v in headers.items()}, data=png, timeout=60)
+        if put.status_code not in (200, 201, 204):
+            raise AssertionError(f"PUT de evidencia HTTP {put.status_code}: {put.text[:300]}")
+        confirmed = body(call("POST", f"/denuncias/{COMPLAINT_ID}/adjuntos/confirm",
+                              json={"storage_key": key}))
+        record("Evidencia: URL presignada + PUT + confirmación",
+               bool(confirmed.get("id") or confirmed.get("storage_key")), key)
+        attachments = body(call("GET", f"/denuncias/{COMPLAINT_ID}/adjuntos"))
+        record("Evidencia asociada a la denuncia",
+               isinstance(attachments, list) and any(x.get("storage_key") == key for x in attachments))
+    except Exception as evidence_error:
+        record("Evidencia: URL presignada + PUT + confirmación", False, str(evidence_error))
 
     status_result = call("PATCH", f"/denuncias/{COMPLAINT_ID}/estado",
                          json={"status": "en_revision", "note": "prueba automatizada"},
