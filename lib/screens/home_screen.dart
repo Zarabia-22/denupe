@@ -25,7 +25,6 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _profileError = false;
   final PendingEvidenceStore _evidenceStore = PendingEvidenceStore();
   List<PendingEvidenceBatch> _pendingEvidence = [];
-  bool _loadingPendingEvidence = false;
   bool _retryingPendingEvidence = false;
 
   @override
@@ -56,7 +55,6 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _loadPendingEvidence() async {
     final userId = api.currentUser?.id;
     if (userId == null) return;
-    if (mounted) setState(() => _loadingPendingEvidence = true);
     try {
       final batches = await _evidenceStore.pendingForUser(userId);
       if (!mounted) return;
@@ -64,7 +62,6 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {
       // La pantalla principal debe seguir disponible aunque el almacenamiento local falle.
     } finally {
-      if (mounted) setState(() => _loadingPendingEvidence = false);
     }
   }
 
