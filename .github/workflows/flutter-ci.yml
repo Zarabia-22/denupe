@@ -34,7 +34,9 @@ jobs:
         run: flutter pub get
 
       - name: Analyze
-        run: flutter analyze
+        # Los avisos informativos del SDK Flutter no deben bloquear CI.
+        # Los errores y warnings siguen siendo fallos.
+        run: flutter analyze --no-fatal-infos
 
       - name: Run tests
         run: flutter test --coverage
