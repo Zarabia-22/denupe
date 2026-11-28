@@ -76,7 +76,8 @@ def run():
     # Todas las funciones IA publicadas por el backend principal.
     ai_category = body(call("POST", "/ia/sugerir-categoria", json={
         "titulo": "Luminaria pública apagada en vía peatonal", "descripcion": description}))
-    record("IA: sugerencia de categoría", isinstance(ai_category, (dict, list)), json.dumps(ai_category, ensure_ascii=False)[:300])
+    record("IA: sugerencia de categoría", isinstance(ai_category, dict) and ai_category.get("sugerida") is True
+           and bool(ai_category.get("categoria")), json.dumps(ai_category, ensure_ascii=False)[:300])
 
     territory = body(call("GET", "/ia/territorio/catalogo-distrital", params={"latitud": LAT, "longitud": LON}))
     record("IA: catálogo territorial", isinstance(territory, (dict, list)), json.dumps(territory, ensure_ascii=False)[:300])
@@ -90,8 +91,12 @@ def run():
     categories = body(call("GET", "/catalogos/categorias"))
     if not isinstance(categories, list) or not categories:
         raise AssertionError("Catálogo de categorías vacío: no se puede crear la denuncia.")
-    ai_code = find_value(ai_category, ("categoria_code", "category_code", "codigo", "code"))
-    category = next((x for x in categories if ai_code and str(x.get("code", "")).lower() == ai_code.lower()), categories[0])
+    ai_category_name = str(ai_category.get("categoria") or "").strip() if isinstance(ai_category, dict) else ""
+    matched_category = next((x for x in categories if ai_category_name and
+        ai_category_name.casefold() in {str(x.get("code", "")).casefold(), str(x.get("name", "")).casefold()}), None)
+    record("IA: categoría sugerida corresponde al catálogo oficial",
+           matched_category is not None, f"sugerencia={ai_category_name}; coincidencia={matched_category is not None}")
+    category = matched_category or categories[0]
     category_id = category["id"]
     category_code = category.get("code") or category.get("name") or "alumbrado"
 
