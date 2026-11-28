@@ -44,11 +44,13 @@ jobs:
         env:
           DENUPE_TEST_EMAIL: ${{ secrets.DENUPE_TEST_EMAIL }}
           DENUPE_TEST_PASSWORD: ${{ secrets.DENUPE_TEST_PASSWORD }}
+          DENUPE_TEST_SECOND_EMAIL: ${{ secrets.DENUPE_TEST_SECOND_EMAIL }}
+          DENUPE_TEST_SECOND_PASSWORD: ${{ secrets.DENUPE_TEST_SECOND_PASSWORD }}
         run: |
           test -n "$DENUPE_TEST_EMAIL" || (echo "::error::Falta el secreto DENUPE_TEST_EMAIL" && exit 1)
           test -n "$DENUPE_TEST_PASSWORD" || (echo "::error::Falta el secreto DENUPE_TEST_PASSWORD" && exit 1)
-          test -n "${{ secrets.DENUPE_TEST_SECOND_EMAIL }}" || (echo "::error::Falta el secreto DENUPE_TEST_SECOND_EMAIL" && exit 1)
-          test -n "${{ secrets.DENUPE_TEST_SECOND_PASSWORD }}" || (echo "::error::Falta el secreto DENUPE_TEST_SECOND_PASSWORD" && exit 1)
+          test -n "$DENUPE_TEST_SECOND_EMAIL" || (echo "::error::Falta el secreto DENUPE_TEST_SECOND_EMAIL" && exit 1)
+          test -n "$DENUPE_TEST_SECOND_PASSWORD" || (echo "::error::Falta el secreto DENUPE_TEST_SECOND_PASSWORD" && exit 1)
       - name: Execute end-to-end complaint flow
         env:
           DENUPE_API_URL: ${{ inputs.api_url }}
