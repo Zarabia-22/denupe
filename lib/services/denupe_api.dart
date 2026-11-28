@@ -37,18 +37,32 @@ class DenupeApi {
   static const signedUrlTtl=Duration(minutes:4),_pageSize=50,_maxPages=100;
   static final _codePattern=RegExp(r'^[a-z0-9_]+$');
   String? _access,_refresh; DenupeUser? _user;
+  bool _sessionValidated=false;
   bool _persistSession=true;
   Future<bool>? _refreshFuture;
   final Map<String,_SignedUrl> _signedUrls={};
   final ValueNotifier<int> authStateTick=ValueNotifier<int>(0);
   String get _base=>Config.apiBaseUrl.replaceFirst(RegExp(r'/+$'),'');
   DenupeUser? get currentUser=>_user;
-  bool get isAuthenticated=>_access!=null;
+  bool get isAuthenticated=>_access!=null&&_sessionValidated&&_user!=null;
 
   Future<void> initialize() async {
-    _access=await _storage.read(key:_accessKey); _refresh=await _storage.read(key:_refreshKey);
-    if(_access==null){if(_refresh!=null)await _refreshSession();return;}
-    try{_setUser(await _request('GET','/auth/me'));}on DenupeApiException catch(e){if(e.statusCode==401&&_refresh==null)await _clear();}catch(_){}
+    _sessionValidated=false;
+    _access=await _storage.read(key:_accessKey);
+    _refresh=await _storage.read(key:_refreshKey);
+    if(_access==null&&_refresh!=null) await _refreshSession();
+    if(_access==null) return;
+    try {
+      _setUser(await _request('GET','/auth/me'));
+      _sessionValidated=_user!=null;
+    } on DenupeApiException catch(e) {
+      // Una sesión no validada nunca debe abrir el área privada.
+      // Si no existe refresh token, el JWT rechazado ya no es recuperable.
+      if(e.statusCode==401&&_refresh==null) await _clear();
+    } catch (_) {
+      // Un fallo transitorio de red no convierte el token en una sesión válida.
+      _sessionValidated=false;
+    }
   }
   void _setUser(Map<String,dynamic> d){
     final u=d['user']??d;
@@ -64,9 +78,9 @@ class DenupeApi {
     _access=a;if(r!=null&&r.isNotEmpty)_refresh=r;_persistSession=persist??_persistSession;
     if(_persistSession){await _storage.write(key:_accessKey,value:a);if(_refresh!=null)await _storage.write(key:_refreshKey,value:_refresh!);}
     else{await _storage.delete(key:_accessKey);await _storage.delete(key:_refreshKey);}
-    _signedUrls.clear();_setUser(d);authStateTick.value++;
+    _signedUrls.clear();_setUser(d);_sessionValidated=_user!=null;authStateTick.value++;
   }
-  Future<void> _clear()async{_access=null;_refresh=null;_user=null;_persistSession=true;_signedUrls.clear();await _storage.delete(key:_accessKey);await _storage.delete(key:_refreshKey);authStateTick.value++;}
+  Future<void> _clear()async{_access=null;_refresh=null;_user=null;_sessionValidated=false;_persistSession=true;_signedUrls.clear();await _storage.delete(key:_accessKey);await _storage.delete(key:_refreshKey);authStateTick.value++;}
   Map<String,String> _headers(bool auth){final h={'Accept':'application/json'};if(auth&&_access!=null)h['Authorization']='Bearer $_access';return h;}
   Future<http.Response> _send(String method,String path,{Map<String,dynamic>? body,Map<String,String>? query,bool auth=true}) {
     final uri=Uri.parse('$_base/api/v1$path').replace(queryParameters:query==null||query.isEmpty?null:query);
