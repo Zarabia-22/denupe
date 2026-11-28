@@ -476,7 +476,14 @@ class _ComplaintConfirmationScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope<bool>(
+      canPop: _pendingFailedAttachments.isEmpty && !_confirming,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop && _pendingFailedAttachments.isNotEmpty && mounted) {
+          _showMessage('Primero reintenta la carga de las evidencias pendientes. No cierres esta pantalla todavía.');
+        }
+      },
+      child: Scaffold(
       appBar: AppBar(title: const Text('Confirmar denuncia')),
       body: Column(
         children: [
@@ -490,6 +497,7 @@ class _ComplaintConfirmationScreenState
           ),
           Expanded(child: _buildBody()),
         ],
+      ),
       ),
     );
   }
@@ -519,7 +527,7 @@ class _ComplaintConfirmationScreenState
                   style: const TextStyle(fontWeight: FontWeight.w600),
                 ),
                 const SizedBox(height: 6),
-                const Text('Puedes reintentar la carga ahora o abrir el detalle de la denuncia más tarde para revisarla.'),
+                const Text('Mantén esta pantalla abierta y reintenta la carga. No cierres la aplicación hasta que todas las evidencias estén cargadas.'),
                 const SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
@@ -528,10 +536,6 @@ class _ComplaintConfirmationScreenState
                     FilledButton.tonal(
                       onPressed: _confirming ? null : _retryFailedAttachments,
                       child: const Text('Reintentar adjuntos'),
-                    ),
-                    OutlinedButton(
-                      onPressed: _confirming ? null : () => Navigator.of(context).pop(true),
-                      child: const Text('Ir al detalle después'),
                     ),
                   ],
                 ),
@@ -542,7 +546,7 @@ class _ComplaintConfirmationScreenState
         ],
         Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(10)), child: Row(children: [const Icon(Icons.info_outline, color: DenuPeColors.primary), const SizedBox(width: 8), Expanded(child: Text('Al confirmar, tu denuncia se registrará con la opción elegida${_districtFor(null).isEmpty ? '' : ' para ${_districtFor(null)}'} o quedará en análisis interno si no hay una opción válida.'))])),
         const SizedBox(height: 16),
-        Row(children: [OutlinedButton(onPressed: _confirming ? null : () => Navigator.of(context).pop(_createdComplaint != null), child: Text(_createdComplaint != null ? 'Cerrar' : 'Editar')), const SizedBox(width: 8), Expanded(child: FilledButton.icon(
+        Row(children: [OutlinedButton(onPressed: _confirming || _pendingFailedAttachments.isNotEmpty ? null : () => Navigator.of(context).pop(_createdComplaint != null), child: Text(_createdComplaint != null ? 'Cerrar' : 'Editar')), const SizedBox(width: 8), Expanded(child: FilledButton.icon(
           onPressed: _confirming ? null : _confirm,
           style: FilledButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 16),
