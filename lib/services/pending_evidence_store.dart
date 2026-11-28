@@ -81,6 +81,7 @@ class PendingEvidenceStore {
         final raw = data['attachments'];
         if (complaintId is! String || raw is! List) continue;
         final attachments = <ComplaintAttachment>[];
+        final keys = <String>[];
         for (final value in raw) {
           if (value is! Map) continue;
           final filename = value['file'];
@@ -93,11 +94,13 @@ class PendingEvidenceStore {
             contentType: value['content_type']?.toString() ?? 'application/octet-stream',
             bytes: await file.readAsBytes(),
           ));
+          keys.add(filename);
         }
         if (attachments.isNotEmpty) {
           batches.add(PendingEvidenceBatch(
             complaintId: complaintId,
             attachments: attachments,
+            keys: keys,
           ));
         }
       } on FormatException {
@@ -107,6 +110,36 @@ class PendingEvidenceStore {
       }
     }
     return batches;
+  }
+
+  /// Marca un archivo como subido y lo elimina del manifiesto local.
+  Future<void> markUploaded({
+    required String userId,
+    required String complaintId,
+    required String fileKey,
+  }) async {
+    if (fileKey != File(fileKey).uri.pathSegments.last || !fileKey.endsWith('.bin')) {
+      throw ArgumentError.value(fileKey, 'fileKey');
+    }
+    final directory = await _complaintDirectory(userId, complaintId);
+    final manifest = await _manifest(directory);
+    if (!await manifest.exists()) return;
+    final data = jsonDecode(await manifest.readAsString());
+    if (data is! Map || data['user_id'] != userId || data['complaint_id'] != complaintId) return;
+    final entries = List<Map<String, dynamic>>.from(data['attachments'] as List? ?? []);
+    final removed = entries.where((entry) => entry['file'] == fileKey).toList();
+    entries.removeWhere((entry) => entry['file'] == fileKey);
+    for (final entry in removed) {
+      final file = File('${directory.path}/${entry['file']}');
+      if (await file.exists()) await file.delete();
+    }
+    if (entries.isEmpty) {
+      await removeBatch(userId: userId, complaintId: complaintId);
+      return;
+    }
+    final temporary = File('${manifest.path}.tmp');
+    await temporary.writeAsString(jsonEncode({...data, 'attachments': entries}), flush: true);
+    await temporary.rename(manifest.path);
   }
 
   /// Elimina el lote solo después de confirmar todas las subidas.
@@ -123,8 +156,10 @@ class PendingEvidenceBatch {
   const PendingEvidenceBatch({
     required this.complaintId,
     required this.attachments,
+    required this.keys,
   });
 
   final String complaintId;
   final List<ComplaintAttachment> attachments;
+  final List<String> keys;
 }
