@@ -38,6 +38,8 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Validate E2E script syntax
+        run: python -m py_compile scripts/e2e_complaint_flow.py
       - name: Install test dependency
         run: python -m pip install --upgrade requests
       - name: Validate required secrets
