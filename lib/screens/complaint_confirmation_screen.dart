@@ -9,6 +9,7 @@ import '../services/denupe_api.dart';
 import '../services/ai_entity_service.dart';
 import '../services/entity_display_name.dart';
 import '../services/friendly_error.dart';
+import '../services/pending_evidence_store.dart';
 
 class ComplaintConfirmationScreen extends StatefulWidget {
   const ComplaintConfirmationScreen({
@@ -60,6 +61,7 @@ class _ComplaintConfirmationScreenState
   Complaint? _createdComplaint;
   int _failedAttachmentCount = 0;
   List<ComplaintAttachment> _pendingFailedAttachments = [];
+  final PendingEvidenceStore _evidenceStore = PendingEvidenceStore();
 
   @override
   void initState() {
@@ -385,7 +387,9 @@ class _ComplaintConfirmationScreenState
     List<ComplaintAttachment> attachments,
   ) async {
     final failed = <ComplaintAttachment>[];
-    for (final item in attachments) {
+    final userId = api.currentUser?.id;
+    for (var index = 0; index < attachments.length; index++) {
+      final item = attachments[index];
       try {
         await api.uploadComplaintMedia(
           complaintId: complaint.id,
@@ -394,6 +398,13 @@ class _ComplaintConfirmationScreenState
           contentType: item.contentType,
           mediaType: item.mediaType,
         );
+        if (userId != null) {
+          await _evidenceStore.markUploaded(
+            userId: userId,
+            complaintId: complaint.id,
+            fileKey: 'evidence_$index.bin',
+          );
+        }
       } catch (_) {
         failed.add(item);
       }
@@ -403,19 +414,53 @@ class _ComplaintConfirmationScreenState
 
   Future<void> _retryFailedAttachments() async {
     final complaint = _createdComplaint;
-    if (complaint == null || _pendingFailedAttachments.isEmpty || _confirming) return;
+    final userId = api.currentUser?.id;
+    if (complaint == null || _pendingFailedAttachments.isEmpty || _confirming || userId == null) return;
     setState(() => _confirming = true);
-    final failed = await _uploadAttachments(complaint, List<ComplaintAttachment>.of(_pendingFailedAttachments));
-    if (!mounted) return;
-    setState(() {
-      _confirming = false;
-      _pendingFailedAttachments = failed;
-      _failedAttachmentCount = failed.length;
-    });
-    if (failed.isEmpty) {
-      _showMessage('Todos los adjuntos se cargaron correctamente.');
-    } else {
-      _showMessage('Aún faltan ${failed.length} adjunto(s) por cargar.');
+    try {
+      await _evidenceStore.saveBatch(
+        userId: userId,
+        complaintId: complaint.id,
+        attachments: _pendingFailedAttachments,
+      );
+      final batches = await _evidenceStore.pendingForUser(userId);
+      final batch = batches.where((item) => item.complaintId == complaint.id).firstOrNull;
+      if (batch != null) {
+        for (var index = 0; index < batch.attachments.length; index++) {
+          final item = batch.attachments[index];
+          try {
+            await api.uploadComplaintMedia(
+              complaintId: complaint.id,
+              bytes: item.bytes,
+              filename: item.name,
+              contentType: item.contentType,
+              mediaType: item.mediaType,
+            );
+            await _evidenceStore.markUploaded(
+              userId: userId,
+              complaintId: complaint.id,
+              fileKey: batch.keys[index],
+            );
+          } catch (_) {}
+        }
+      }
+      final remaining = (await _evidenceStore.pendingForUser(userId))
+          .where((item) => item.complaintId == complaint.id)
+          .expand((item) => item.attachments)
+          .toList();
+      if (!mounted) return;
+      setState(() {
+        _confirming = false;
+        _pendingFailedAttachments = remaining;
+        _failedAttachmentCount = remaining.length;
+      });
+      _showMessage(remaining.isEmpty
+          ? 'Todos los adjuntos se cargaron correctamente.'
+          : 'Aún faltan ${remaining.length} adjunto(s) por cargar.');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _confirming = false);
+      _showMessage('No se pudieron recuperar las evidencias pendientes: ${friendlyError(e)}');
     }
   }
 
@@ -445,11 +490,24 @@ class _ComplaintConfirmationScreenState
         rutaTerritorialCode: _selectedTerritorialCategoryCode,
         districtUbigeo: districtUbigeo.isEmpty ? null : districtUbigeo,
       );
+      if (!mounted) return;
+      setState(() {
+        _createdComplaint = complaint;
+        _pendingFailedAttachments = List<ComplaintAttachment>.of(widget.media);
+        _failedAttachmentCount = widget.media.length;
+      });
+      final userId = api.currentUser?.id;
+      if (widget.media.isNotEmpty && userId != null) {
+        await _evidenceStore.saveBatch(
+          userId: userId,
+          complaintId: complaint.id,
+          attachments: widget.media,
+        );
+      }
       final failed = await _uploadAttachments(complaint, widget.media);
       if (!mounted) return;
       setState(() {
         _confirming = false;
-        _createdComplaint = complaint;
         _pendingFailedAttachments = failed;
         _failedAttachmentCount = failed.length;
       });
