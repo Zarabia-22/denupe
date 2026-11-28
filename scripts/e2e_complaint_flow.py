@@ -177,10 +177,11 @@ def run():
         if not second_token: raise AssertionError("Segundo usuario sin access_token.")
         foreign = call("GET", "/denuncias/" + COMPLAINT_ID, token=second_token, expected=(403, 404))
         record("Regla: impedir lectura de denuncia ajena", foreign.status_code in (403, 404))
-        foreign_up = call("POST", f"/denuncias/{COMPLAINT_ID}/adjuntos/upload-url", token=second_token,
-                          json={"filename": "foreign.png", "mime_type": "image/png", "size_bytes": len(png)},
-                          expected=(403, 404))
-        record("Regla: impedir adjuntar evidencia a denuncia ajena", foreign_up.status_code in (403, 404))
+        foreign_up = call("POST", f"/denuncias/{COMPLAINT_ID}/adjuntos", token=second_token,
+                          json={"storage_key": f"complaints/{COMPLAINT_ID}/{me.get('id')}/foreign.png",
+                                "media_type": "image", "mime_type": "image/png"},
+                          expected=(403,))
+        record("Regla: impedir adjuntar evidencia a denuncia ajena", foreign_up.status_code == 403)
     else:
         record("Regla: aislamiento entre usuarios", False,
                "Faltan DENUPE_TEST_SECOND_EMAIL y DENUPE_TEST_SECOND_PASSWORD.")
