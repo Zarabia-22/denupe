@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path_provider/path_provider.dart';
 
 import '../models.dart';
@@ -37,7 +38,7 @@ class PendingEvidenceStore {
     required String complaintId,
     required List<ComplaintAttachment> attachments,
   }) async {
-    if (attachments.isEmpty) return;
+    if (kIsWeb || attachments.isEmpty) return;
     final directory = await _complaintDirectory(userId, complaintId);
     await directory.create(recursive: true);
     final entries = <Map<String, dynamic>>[];
@@ -66,6 +67,7 @@ class PendingEvidenceStore {
 
   /// Recupera únicamente archivos pertenecientes al usuario autenticado.
   Future<List<PendingEvidenceBatch>> pendingForUser(String userId) async {
+    if (kIsWeb) return [];
     final root = await _rootDirectory();
     final userDirectory = Directory('${root.path}/pending_evidence/${_safeSegment(userId)}');
     if (!await userDirectory.exists()) return [];
@@ -118,6 +120,7 @@ class PendingEvidenceStore {
     required String complaintId,
     required String fileKey,
   }) async {
+    if (kIsWeb) return;
     if (fileKey != File(fileKey).uri.pathSegments.last || !fileKey.endsWith('.bin')) {
       throw ArgumentError.value(fileKey, 'fileKey');
     }
@@ -147,6 +150,7 @@ class PendingEvidenceStore {
     required String userId,
     required String complaintId,
   }) async {
+    if (kIsWeb) return;
     final directory = await _complaintDirectory(userId, complaintId);
     if (await directory.exists()) await directory.delete(recursive: true);
   }
