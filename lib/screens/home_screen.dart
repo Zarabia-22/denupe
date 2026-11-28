@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/app_scope.dart';
 import '../services/friendly_error.dart';
+import '../services/pending_evidence_store.dart';
 import '../theme/denupe_colors.dart';
 import 'mis_denuncias_screen.dart';
 import 'new_complaint_screen.dart';
@@ -22,6 +23,10 @@ class _HomeScreenState extends State<HomeScreen> {
   int _unreadNotifications = 0;
   bool _isStaff = false;
   bool _profileError = false;
+  final PendingEvidenceStore _evidenceStore = PendingEvidenceStore();
+  List<PendingEvidenceBatch> _pendingEvidence = [];
+  bool _loadingPendingEvidence = false;
+  bool _retryingPendingEvidence = false;
 
   @override
   void initState() {
@@ -30,6 +35,7 @@ class _HomeScreenState extends State<HomeScreen> {
     notificationsTick.addListener(_onNotificationsTick);
     _loadProfile();
     _refreshUnreadNotifications();
+    _loadPendingEvidence();
   }
 
   Future<void> _loadProfile() async {
@@ -44,6 +50,68 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {
       if (!mounted) return;
       setState(() => _profileError = true);
+    }
+  }
+
+  Future<void> _loadPendingEvidence() async {
+    final userId = api.currentUser?.id;
+    if (userId == null) return;
+    if (mounted) setState(() => _loadingPendingEvidence = true);
+    try {
+      final batches = await _evidenceStore.pendingForUser(userId);
+      if (!mounted) return;
+      setState(() => _pendingEvidence = batches);
+    } catch (_) {
+      // La pantalla principal debe seguir disponible aunque el almacenamiento local falle.
+    } finally {
+      if (mounted) setState(() => _loadingPendingEvidence = false);
+    }
+  }
+
+  Future<void> _retryPendingEvidence() async {
+    final userId = api.currentUser?.id;
+    if (userId == null || _retryingPendingEvidence) return;
+    setState(() => _retryingPendingEvidence = true);
+    var uploaded = 0;
+    var failed = 0;
+    try {
+      final batches = await _evidenceStore.pendingForUser(userId);
+      for (final batch in batches) {
+        for (var index = 0; index < batch.attachments.length; index++) {
+          final item = batch.attachments[index];
+          try {
+            await api.uploadComplaintMedia(
+              complaintId: batch.complaintId,
+              bytes: item.bytes,
+              filename: item.name,
+              contentType: item.contentType,
+              mediaType: item.mediaType,
+            );
+            await _evidenceStore.markUploaded(
+              userId: userId,
+              complaintId: batch.complaintId,
+              fileKey: batch.keys[index],
+            );
+            uploaded++;
+          } catch (_) {
+            failed++;
+          }
+        }
+      }
+      await _loadPendingEvidence();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(failed == 0
+            ? 'Se recuperaron $uploaded evidencia(s) pendiente(s).'
+            : 'Se recuperaron $uploaded evidencia(s); quedan $failed por reintentar.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('No se pudieron recuperar las evidencias: ${friendlyError(e)}')),
+      );
+    } finally {
+      if (mounted) setState(() => _retryingPendingEvidence = false);
     }
   }
 
@@ -113,6 +181,33 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
+          if (_pendingEvidence.isNotEmpty)
+            Card(
+              margin: const EdgeInsets.fromLTRB(12, 10, 12, 6),
+              color: const Color(0xFFFFF8E1),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Row(
+                  children: [
+                    const Icon(Icons.cloud_upload_outlined, color: Color(0xFFF9A825)),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        '${_pendingEvidence.fold<int>(0, (sum, batch) => sum + batch.attachments.length)} evidencia(s) esperan conexión para terminar de cargarse.',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: _retryingPendingEvidence ? null : _retryPendingEvidence,
+                      child: _retryingPendingEvidence
+                          ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                          : const Text('Reintentar'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
           if (_profileError)
             Container(
               width: double.infinity,
