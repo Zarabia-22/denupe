@@ -424,7 +424,8 @@ class _ComplaintConfirmationScreenState
         attachments: _pendingFailedAttachments,
       );
       final batches = await _evidenceStore.pendingForUser(userId);
-      final batch = batches.where((item) => item.complaintId == complaint.id).firstOrNull;
+      final matchingBatches = batches.where((item) => item.complaintId == complaint.id).toList();
+      final batch = matchingBatches.isEmpty ? null : matchingBatches.first;
       if (batch != null) {
         for (var index = 0; index < batch.attachments.length; index++) {
           final item = batch.attachments[index];
