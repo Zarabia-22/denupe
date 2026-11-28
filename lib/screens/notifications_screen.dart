@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../theme/denupe_colors.dart';
 
 import '../models.dart';
 import '../services/app_scope.dart';
+import '../services/friendly_error.dart';
 import 'complaint_detail_screen.dart';
 
 class NotificacionesScreen extends StatefulWidget {
@@ -20,11 +23,21 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
   List<AppNotification> _items = [];
   bool _loading = true;
   String? _error;
+  Timer? _pollTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _pollTimer = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (mounted) _load(showSpinner: false, notifyHome: true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _pollTimer?.cancel();
+    super.dispose();
   }
 
   @override
@@ -35,21 +48,25 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
     }
   }
 
-  Future<void> _load({bool showSpinner = true}) async {
-    if (showSpinner && mounted) setState(() => _loading = true);
+  Future<void> _load({bool showSpinner = true, bool notifyHome = false}) async {
+    if (!mounted) return;
+    if (showSpinner) setState(() => _loading = true);
     try {
       final items = await api.notifications();
       if (!mounted) return;
+      final unreadBefore = _items.where((n) => !n.isRead).length;
+      final unreadAfter = items.where((n) => !n.isRead).length;
       setState(() {
         _items = items;
         _loading = false;
         _error = null;
       });
+      if (notifyHome && unreadAfter != unreadBefore) bumpNotificationsTick();
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = friendlyError(e);
       });
     }
   }
@@ -62,23 +79,66 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
           builder: (_) => ComplaintDetailScreen(complaintId: complaintId),
         ),
       );
+      if (!mounted) return;
     }
     if (!notification.isRead) {
       try {
         await api.markNotificationRead(notification.id);
+        if (!mounted) return;
+        setState(() {
+          _items = _items
+              .map((n) => n.id == notification.id
+                  ? AppNotification(
+                      id: n.id,
+                      userId: n.userId,
+                      complaintId: n.complaintId,
+                      title: n.title,
+                      body: n.body,
+                      isRead: true,
+                      createdAt: n.createdAt,
+                    )
+                  : n)
+              .toList();
+        });
         bumpNotificationsTick();
-      } catch (_) {}
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(friendlyError(e))));
+      }
     }
   }
 
   Future<void> _markAllRead() async {
+    final unreadBefore = _items.where((n) => !n.isRead).toList();
+    if (unreadBefore.isEmpty) return;
     try {
       await api.markAllNotificationsRead();
-      bumpNotificationsTick();
+      final after = await api.notifications();
+      if (!mounted) return;
+      final unreadAfter = after.where((n) => !n.isRead).length;
+      setState(() {
+        _items = after;
+        _error = null;
+      });
+      if (unreadAfter < unreadBefore.length) {
+        bumpNotificationsTick();
+      }
+      if (unreadAfter > 0) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              unreadAfter == 1
+                  ? 'No se pudo marcar 1 notificación como leída.'
+                  : 'No se pudieron marcar $unreadAfter notificaciones como leídas.',
+            ),
+          ),
+        );
+      }
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.toString())));
+          .showSnackBar(SnackBar(content: Text(friendlyError(e))));
     }
   }
 
@@ -97,6 +157,8 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
             const Icon(Icons.cloud_off, size: 48),
             const SizedBox(height: 12),
             const Text('No se pudieron cargar las notificaciones', textAlign: TextAlign.center),
+            const SizedBox(height: 6),
+            Text(_error!, textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
             const SizedBox(height: 12),
             FilledButton.tonal(onPressed: _load, child: const Text('Reintentar')),
           ],
@@ -185,16 +247,32 @@ class _NotificationCard extends StatelessWidget {
     final color = rejected ? DenuPeColors.error
         : resolved ? DenuPeColors.success
         : progress ? DenuPeColors.warning : DenuPeColors.primary;
-    final background = rejected ? const Color(0xFFFCE8E6)
-        : resolved ? const Color(0xFFE7F4E9)
-        : progress ? const Color(0xFFFFF4D6) : const Color(0xFFE3F2FD);
+    final unread = !notification.isRead;
+    final background = unread
+        ? (rejected ? const Color(0xFFFCE8E6)
+            : resolved ? const Color(0xFFE7F4E9)
+            : progress ? const Color(0xFFFFF4D6) : const Color(0xFFE3F2FD))
+        : DenuPeColors.surface;
     final icon = rejected ? Icons.cancel_outlined
         : resolved ? Icons.check_circle_outline
         : progress ? Icons.pending_outlined : Icons.notifications_active_outlined;
+    final titleStyle = TextStyle(
+      fontWeight: unread ? FontWeight.bold : FontWeight.w500,
+      color: unread ? DenuPeColors.text : Colors.grey.shade700,
+    );
+    final bodyStyle = TextStyle(
+      color: unread ? DenuPeColors.text : Colors.grey.shade600,
+    );
     return Card(
       color: background,
       margin: EdgeInsets.zero,
       clipBehavior: Clip.antiAlias,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: unread ? color.withValues(alpha: 0.35) : DenuPeColors.border,
+        ),
+      ),
       child: InkWell(
         onTap: onTap,
         child: Padding(
@@ -203,26 +281,31 @@ class _NotificationCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               CircleAvatar(
-                backgroundColor: color,
-                child: Icon(icon,
-                  color: progress && !rejected && !resolved
-                      ? DenuPeColors.text
-                      : Colors.white),
+                backgroundColor: unread ? color : Colors.grey.shade300,
+                child: Icon(
+                  icon,
+                  color: unread
+                      ? (progress && !rejected && !resolved ? DenuPeColors.text : Colors.white)
+                      : Colors.grey.shade700,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(notification.title, style: const TextStyle(fontWeight: FontWeight.bold, color: DenuPeColors.text)),
+                  Text(notification.title, style: titleStyle),
                   if (notification.body != null && notification.body!.isNotEmpty) ...[
                     const SizedBox(height: 4),
-                    Text(notification.body!, style: const TextStyle(color: DenuPeColors.text)),
+                    Text(notification.body!, style: bodyStyle),
                   ],
                   const SizedBox(height: 6),
-                  Text(_fmt(notification.createdAt), style: TextStyle(fontSize: 12, color: color)),
+                  Text(
+                    _fmt(notification.createdAt),
+                    style: TextStyle(fontSize: 12, color: unread ? color : Colors.grey.shade500),
+                  ),
                 ],
               )),
-              const Icon(Icons.chevron_right, color: DenuPeColors.text),
+              Icon(Icons.chevron_right, color: unread ? DenuPeColors.text : Colors.grey.shade400),
             ],
           ),
         ),
@@ -232,12 +315,12 @@ class _NotificationCard extends StatelessWidget {
 }
 
 String _fmt(DateTime d) =>
-    '${d.day}/${d.month}/${d.year} ${d.hour}:${d.minute.toString().padLeft(2, '0')}';
+    '${d.day}/${d.month}/${d.year} ${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 String _notificationGroup(DateTime created) {
   final now = DateTime.now();
   final today = DateTime(now.year, now.month, now.day);
   final day = DateTime(created.year, created.month, created.day);
-  if (day == today) return 'Hoy';
+  if (!day.isBefore(today)) return 'Hoy';
   if (today.difference(day).inDays < 7) return 'Esta semana';
   return 'Más antiguas';
 }

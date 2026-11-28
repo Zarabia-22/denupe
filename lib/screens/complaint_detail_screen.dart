@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../models.dart';
 import '../services/app_scope.dart';
 import '../services/complaint_realtime.dart';
+import '../services/friendly_error.dart';
 
 class ComplaintDetailScreen extends StatefulWidget {
   const ComplaintDetailScreen({
@@ -28,6 +29,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
   List<Authority> _autoridades = [];
   bool _loading = true;
   String? _error;
+  String? _partialError;
 
   @override
   void initState() {
@@ -38,7 +40,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
 
   @override
   void dispose() {
-    realtime.unsubscribeComplaint(widget.complaintId);
+    realtime.unsubscribeComplaint(widget.complaintId, _onStatusChanged);
     super.dispose();
   }
 
@@ -58,27 +60,45 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _partialError = null;
     });
     try {
-      final results = await Future.wait([
-        api.complaintById(widget.complaintId),
-        api.complaintHistory(widget.complaintId),
-        api.complaintMedia(widget.complaintId),
-        authorities(),
-      ]);
+      final complaint = await api.complaintById(widget.complaintId);
+      List<StatusHistory> history = _history;
+      List<ComplaintMedia> media = _media;
+      List<Authority> autoridades = _autoridades;
+      final warnings = <String>[];
+      try {
+        history = await api.complaintHistory(widget.complaintId);
+      } catch (_) {
+        warnings.add('historial');
+      }
+      try {
+        media = await api.complaintMedia(widget.complaintId);
+      } catch (_) {
+        warnings.add('adjuntos');
+      }
+      try {
+        autoridades = await authorities();
+      } catch (_) {
+        warnings.add('entidades');
+      }
       if (!mounted) return;
       setState(() {
-        _complaint = results[0] as Complaint?;
-        _history = results[1] as List<StatusHistory>;
-        _media = results[2] as List<ComplaintMedia>;
-        _autoridades = results[3] as List<Authority>;
+        _complaint = complaint;
+        _history = history;
+        _media = media;
+        _autoridades = autoridades;
         _loading = false;
+        _partialError = warnings.isEmpty
+            ? null
+            : 'No se pudo cargar ${warnings.join(', ')}. Mostrando la información disponible.';
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = friendlyError(e);
       });
     }
   }
@@ -124,6 +144,17 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           _StatusBanner(status: complaint.status),
+          if (_partialError != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: DenuPeColors.warning.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(_partialError!),
+            ),
+          ],
           if (widget.showStatusUpdate) ...[
             const SizedBox(height: 12),
             FilledButton.tonalIcon(
@@ -196,6 +227,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
   String _authorityLabel(String? id) => authorityNameOf(_autoridades, id);
 
   List<Widget> _buildMediaSection() {
+    final canDelete = api.currentUser?.id == _complaint?.userId;
     return [
       const SizedBox(height: 16),
       Text('Evidencias', style: Theme.of(context).textTheme.titleMedium),
@@ -210,7 +242,7 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
             final item = _media[index];
             return _MediaTile(
               media: item,
-              onDelete: () => _confirmDeleteMedia(item),
+              onDelete: canDelete ? () => _confirmDeleteMedia(item) : null,
             );
           },
         ),
@@ -240,11 +272,12 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
     if (confirmed != true || !mounted) return;
     try {
       await api.deleteComplaintMedia(media);
-      _load();
-    } catch (_) {
+      if (!mounted) return;
+      await _load();
+    } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('No se pudo eliminar el adjunto')),
+        SnackBar(content: Text(friendlyError(e))),
       );
     }
   }
@@ -264,14 +297,15 @@ class _ComplaintDetailScreenState extends State<ComplaintDetailScreen> {
         note: result.note.isEmpty ? null : result.note,
       );
       if (!mounted) return;
+      bumpNotificationsTick();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Estado actualizado')),
       );
-      _load();
+      await _load();
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('No se pudo actualizar el estado: ${e.toString()}')),
+        SnackBar(content: Text(friendlyError(e))),
       );
     }
   }
@@ -296,10 +330,16 @@ class _StatusDialogState extends State<_StatusDialog> {
     super.dispose();
   }
 
+  List<String> _allowedStatuses(String current) {
+    final allowed = statusTransitions[current];
+    if (allowed == null || allowed.isEmpty) return const <String>[];
+    return allowed.where(statusLabels.containsKey).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final options = statusLabels.entries
-        .where((e) => e.key != widget.currentStatus)
+    final options = _allowedStatuses(widget.currentStatus)
+        .map((k) => MapEntry(k, statusLabel(k)))
         .toList();
     return AlertDialog(
       title: const Text('Actualizar estado'),
@@ -352,7 +392,9 @@ class _StatusDialogState extends State<_StatusDialog> {
   }
 }
 
-String _fmt(DateTime d) => '${d.day}/${d.month}/${d.year} ${d.hour}:${d.minute.toString().padLeft(2, '0')}';
+String _fmt(DateTime d) =>
+    '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year} '
+    '${d.hour.toString().padLeft(2, '0')}:${d.minute.toString().padLeft(2, '0')}';
 
 bool _notBlank(String? v) => v != null && v.trim().isNotEmpty;
 
@@ -407,13 +449,36 @@ class _MediaTileState extends State<_MediaTile> {
   @override
   void initState() {
     super.initState();
-    _loadSignedUrl();
+    final existing = widget.media.url.trim();
+    if (existing.isNotEmpty) {
+      _url = existing;
+    } else {
+      _loadSignedUrl();
+    }
   }
 
-  Future<void> _loadSignedUrl() async {
-    setState(() => _url = null);
+  Future<void> _loadSignedUrl({bool forceRefresh = false}) async {
+    final existing = widget.media.url.trim();
+    if (!forceRefresh && existing.isNotEmpty) {
+      if (!mounted) return;
+      setState(() {
+        _url = existing;
+        _failed = false;
+      });
+      return;
+    }
+    if (mounted) {
+      setState(() {
+        _url = null;
+        _failed = false;
+      });
+    }
     try {
-      final url = await api.complaintMediaSignedUrl(widget.media.storageKey);
+      final url = await api.complaintMediaSignedUrl(
+        widget.media.storageKey,
+        complaintId: widget.media.complaintId,
+        forceRefresh: forceRefresh,
+      );
       if (!mounted) return;
       setState(() => _url = url);
     } catch (_) {
@@ -425,7 +490,20 @@ class _MediaTileState extends State<_MediaTile> {
   Future<void> _openVideo() async {
     final url = _url;
     if (url == null) return;
-    await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+    final uri = Uri.parse(url);
+    final canOpen = await canLaunchUrl(uri);
+    if (!mounted) return;
+    if (!canOpen) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('No se pudo abrir el video.')),
+      );
+      return;
+    }
+    final opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    if (!mounted || opened) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('No se pudo abrir el video.')),
+    );
   }
 
   void _openImage() {
@@ -459,11 +537,22 @@ class _MediaTileState extends State<_MediaTile> {
   Widget build(BuildContext context) {
     final Widget preview;
     if (_failed) {
-      preview = Container(
-        width: 120,
-        height: 96,
-        color: Colors.grey.shade200,
-        child: const Icon(Icons.broken_image_outlined),
+      preview = InkWell(
+        onTap: () => _loadSignedUrl(forceRefresh: true),
+        child: Container(
+          width: 120,
+          height: 96,
+          color: Colors.grey.shade200,
+          child: const Column(
+            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.refresh),
+              SizedBox(height: 4),
+              Text('Reintentar', style: TextStyle(fontSize: 11)),
+            ],
+          ),
+        ),
       );
     } else if (widget.media.isImage) {
       final url = _url;
@@ -482,8 +571,9 @@ class _MediaTileState extends State<_MediaTile> {
                   width: 120,
                   height: 96,
                   fit: BoxFit.cover,
-                  errorBuilder: (_, _, _) => const Icon(
-                    Icons.broken_image_outlined,
+                  errorBuilder: (_, _, _) => InkWell(
+                    onTap: () => _loadSignedUrl(forceRefresh: true),
+                    child: const Center(child: Icon(Icons.refresh)),
                   ),
                 ),
         ),

@@ -8,6 +8,7 @@ import 'package:image_picker/image_picker.dart';
 import '../models.dart';
 import '../services/app_scope.dart';
 import '../services/ai_category_service.dart';
+import '../services/friendly_error.dart';
 import 'complaint_confirmation_screen.dart';
 import 'profile_edit_screen.dart';
 
@@ -22,7 +23,16 @@ class NuevaDenunciaScreen extends StatefulWidget {
 
 class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
   static const int _maxMedia = 5;
-  static const int _maxMediaBytes = 50 * 1024 * 1024;
+  static const int _maxImageBytes = 10 * 1024 * 1024;
+  static const int _maxVideoBytes = 50 * 1024 * 1024;
+  static const int _maxTotalBytes = 120 * 1024 * 1024;
+  static const Map<String, int> _allowedMimeBytes = {
+    'image/jpeg': _maxImageBytes,
+    'image/png': _maxImageBytes,
+    'image/webp': _maxImageBytes,
+    'video/mp4': _maxVideoBytes,
+    'video/quicktime': _maxVideoBytes,
+  };
 
   final _formKey = GlobalKey<FormState>();
   final _title = TextEditingController();
@@ -73,36 +83,57 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
   }
 
   Future<void> _loadCategories() async {
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+    List<Category>? list;
+    String? categoryError;
     try {
-      final results = await Future.wait([categories(), api.myProfile()]);
-      final list = results[0] as List<Category>;
-      final profile = results[1] as Profile;
-      if (!mounted) return;
-      setState(() {
-        _cats = list;
-        _profile = profile;
-        _loading = false;
-      });
-      if (_categoryId == null && list.isNotEmpty) {
-        setState(() => _categoryId = list.first.id);
-      }
+      list = await categories();
     } catch (e) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = e.toString();
-      });
+      categoryError = friendlyError(e);
+    }
+    Profile? profile;
+    String? profileError;
+    try {
+      profile = await api.myProfile();
+    } catch (e) {
+      profileError = friendlyError(e);
+    }
+    if (!mounted) return;
+    setState(() {
+      if (list != null) _cats = list;
+      if (profile != null) _profile = profile;
+      _loading = false;
+      _error = categoryError ?? profileError;
+    });
+    if (_categoryId == null && _cats.isNotEmpty) {
+      setState(() => _categoryId = _cats.first.id);
     }
   }
 
   bool get _profileComplete {
     final p = _profile;
     if (p == null) return false;
-    return _notBlank(p.fullName) && _notBlank(p.dni) && _notBlank(p.phone);
+    return _notBlank(p.fullName) &&
+        _isValidPeruvianDni(p.dni ?? '') &&
+        _notBlank(p.phone);
   }
 
   static bool _notBlank(String? v) => v != null && v.trim().isNotEmpty;
+
+  static bool _isValidPeruvianDni(String value) =>
+      RegExp(r'^\d{8}$').hasMatch(value.trim());
+
+  List<String> get _missingProfileFields {
+    final p = _profile;
+    final missing = <String>[];
+    if (p == null || !_notBlank(p.fullName)) missing.add('nombre');
+    if (p == null || !_isValidPeruvianDni(p.dni ?? '')) missing.add('DNI válido');
+    if (p == null || !_notBlank(p.phone)) missing.add('teléfono');
+    return missing;
+  }
 
   Future<void> _editProfile() async {
     final p = _profile;
@@ -110,8 +141,8 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
     final changed = await Navigator.of(context).push<bool>(
       MaterialPageRoute(builder: (_) => ProfileEditScreen(profile: p)),
     );
-    if (changed == true) {
-      _loadCategories();
+    if (changed == true && mounted) {
+      await _loadCategories();
     }
   }
 
@@ -126,20 +157,39 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
       }
-      if (permission == LocationPermission.denied ||
-          permission == LocationPermission.deniedForever) {
+      if (permission == LocationPermission.deniedForever) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context)
+          ..removeCurrentSnackBar()
+          ..showSnackBar(
+            SnackBar(
+              content: const Text('El permiso de ubicación está desactivado permanentemente. Actívalo desde ajustes.'),
+              action: SnackBarAction(
+                label: 'Ajustes',
+                onPressed: Geolocator.openAppSettings,
+              ),
+            ),
+          );
+        return;
+      }
+      if (permission == LocationPermission.denied) {
         _showMessage('Permiso de ubicación no concedido');
         return;
       }
-      final position = await Geolocator.getCurrentPosition();
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+          timeLimit: Duration(seconds: 15),
+        ),
+      );
       if (!mounted) return;
       setState(() {
         _latitude = position.latitude;
         _longitude = position.longitude;
       });
       _showMessage('Ubicación capturada');
-    } catch (_) {
-      _showMessage('No se pudo obtener la ubicación');
+    } catch (e) {
+      _showMessage(friendlyError(e));
     }
   }
 
@@ -167,20 +217,31 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
     }
     try {
       final bytes = await file.readAsBytes();
-      if (bytes.length > _maxMediaBytes) {
-        _showMessage('El archivo supera el límite de 50 MB');
+      final contentType = _normalizeMime(file.mimeType, file.name);
+      final maxBytes = _allowedMimeBytes[contentType];
+      if (maxBytes == null) {
+        _showMessage('Formato no permitido. Usa JPG, PNG, WEBP, MP4 o MOV.');
+        return;
+      }
+      if (bytes.length > maxBytes) {
+        _showMessage('El archivo supera el límite de ${maxBytes ~/ (1024 * 1024)} MB');
+        return;
+      }
+      final totalBytes = _media.fold<int>(bytes.length, (sum, item) => sum + item.bytes.length);
+      if (totalBytes > _maxTotalBytes) {
+        _showMessage('El total de adjuntos supera el límite de ${_maxTotalBytes ~/ (1024 * 1024)} MB');
         return;
       }
       setState(() {
         _media.add(ComplaintAttachment(
           name: file.name,
-          mediaType: mediaType,
+          mediaType: contentType.startsWith('image/') ? 'image' : 'video',
           bytes: bytes,
-          contentType: _mimeFromName(file.name, mediaType),
+          contentType: contentType,
         ));
       });
-    } catch (_) {
-      _showMessage('No se pudo leer el archivo seleccionado');
+    } catch (e) {
+      _showMessage(friendlyError(e));
     }
   }
 
@@ -189,14 +250,54 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
     setState(() => _media.removeAt(index));
   }
 
+  bool get _hasDraftData =>
+      _title.text.trim().isNotEmpty ||
+      _description.text.trim().isNotEmpty ||
+      _address.text.trim().isNotEmpty ||
+      _latitude != null ||
+      _longitude != null ||
+      _media.isNotEmpty;
+
+  Future<void> _cancelForm() async {
+    if (!_hasDraftData) {
+      _formKey.currentState?.reset();
+      setState(() {});
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancelar denuncia'),
+        content: const Text('Se perderán los datos ingresados. ¿Deseas continuar?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialogContext).pop(false), child: const Text('No')),
+          FilledButton(onPressed: () => Navigator.of(dialogContext).pop(true), child: const Text('Sí, cancelar')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    _formKey.currentState?.reset();
+    _title.clear();
+    _description.clear();
+    _address.clear();
+    setState(() {
+      _latitude = null;
+      _longitude = null;
+      _media.clear();
+      _suggestedCategoryId = null;
+    });
+  }
+
   Future<void> _submit() async {
-    _setStep(3);
     if (!_formKey.currentState!.validate()) {
       _setStep(0);
       return;
     }
     if (!_profileComplete) {
-      _showMessage('Completa tu DNI y teléfono en tu perfil para enviar la denuncia');
+      final missing = _missingProfileFields;
+      _showMessage(missing.isEmpty
+          ? 'Completa tu perfil para enviar la denuncia'
+          : 'Completa tu perfil para denunciar: ${missing.join(', ')}');
       return;
     }
     final categoryId = _categoryId;
@@ -204,6 +305,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
       _showMessage('Selecciona una categoría');
       return;
     }
+    _setStep(3);
     final submitted = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => ComplaintConfirmationScreen(
@@ -286,12 +388,12 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
       _showMessage('No hay categorías disponibles para sugerir.');
       return;
     }
+    final navigator = Navigator.of(context, rootNavigator: true);
     setState(() {
       _suggestingAi = true;
       _suggestedCategoryId = null;
     });
 
-    // Conserva la interfaz de carga ya diseñada, sin espera simulada.
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -307,13 +409,11 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
       );
     } on AiCategoryException catch (e) {
       error = e.message;
-    } catch (_) {
-      error = 'No se pudo obtener la sugerencia. Puedes elegir la categoría manualmente.';
+    } catch (e) {
+      error = friendlyError(e);
     } finally {
-      if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-        setState(() => _suggestingAi = false);
-      }
+      if (navigator.mounted) navigator.pop();
+      if (mounted) setState(() => _suggestingAi = false);
     }
     if (!mounted) return;
     if (error != null) {
@@ -397,35 +497,36 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
               _ContactRow(label: 'DNI', value: p.dni),
               _ContactRow(label: 'Correo', value: email),
               _ContactRow(label: 'Teléfono', value: p.phone),
-              if (!complete) ...[
-                const SizedBox(height: 8),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: DenuPeColors.warning.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: DenuPeColors.warning.withValues(alpha: 0.4),
+                if (!complete) ...[
+                  const SizedBox(height: 8),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: DenuPeColors.warning.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: DenuPeColors.warning.withValues(alpha: 0.4),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _missingProfileFields.isEmpty
+                              ? 'Completa tu perfil para poder enviar la denuncia.'
+                              : 'Completa tu perfil para poder enviar la denuncia: ${_missingProfileFields.join(', ')}.',
+                        ),
+                        const SizedBox(height: 4),
+                        TextButton.icon(
+                          onPressed: _editProfile,
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          label: const Text('Actualizar mi perfil'),
+                        ),
+                      ],
                     ),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Completa tu DNI y teléfono en tu perfil para '
-                        'poder enviar la denuncia.',
-                      ),
-                      const SizedBox(height: 4),
-                      TextButton.icon(
-                        onPressed: _editProfile,
-                        icon: const Icon(Icons.edit_outlined, size: 18),
-                        label: const Text('Actualizar mi perfil'),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
             ],
           ),
         ),
@@ -462,19 +563,31 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (_error != null) {
+      final hasCategories = _cats.isNotEmpty;
+      final hasProfile = _profile != null;
+      final title = !hasCategories && !hasProfile
+          ? 'No se pudieron cargar los datos necesarios'
+          : !hasCategories
+              ? 'No se pudieron cargar las categorías'
+              : 'No se pudo cargar tu perfil';
       return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.cloud_off, size: 48),
-            const SizedBox(height: 12),
-            const Text('No se pudieron cargar las categorías', textAlign: TextAlign.center),
-            const SizedBox(height: 12),
-            FilledButton.tonal(
-              onPressed: _loadCategories,
-              child: const Text('Reintentar'),
-            ),
-          ],
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.cloud_off, size: 48),
+              const SizedBox(height: 12),
+              Text(title, textAlign: TextAlign.center),
+              const SizedBox(height: 8),
+              Text(_error!, textAlign: TextAlign.center),
+              const SizedBox(height: 12),
+              FilledButton.tonal(
+                onPressed: _loadCategories,
+                child: const Text('Reintentar'),
+              ),
+            ],
+          ),
         ),
       );
     }
@@ -618,7 +731,13 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
               const SizedBox(height: 16),
               const Text('Ubicación', style: TextStyle(fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
-              GestureDetector(onTap: () => _setStep(1), child: const LocationPreview()),
+              GestureDetector(
+                onTap: () => _setStep(1),
+                child: LocationPreview(
+                  latitude: _latitude,
+                  longitude: _longitude,
+                ),
+              ),
               const SizedBox(height: 8),
               OutlinedButton.icon(
                 onPressed: _captureLocation,
@@ -655,8 +774,8 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                   Expanded(
                     child: OutlinedButton.icon(
                       onPressed: _pickImage,
-                      icon: const Icon(Icons.photo_camera_outlined),
-                      label: const Text('Foto'),
+                      icon: const Icon(Icons.photo_library_outlined),
+                      label: const Text('Galería'),
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -670,7 +789,7 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Row(children: [Expanded(child: OutlinedButton(onPressed: () { _formKey.currentState?.reset(); _title.clear(); _description.clear(); _address.clear(); setState(() { _latitude = null; _longitude = null; _media.clear(); }); }, child: const Text('Cancelar'))), const SizedBox(width: 8), Expanded(child: FilledButton.icon(
+              Row(children: [Expanded(child: OutlinedButton(onPressed: _cancelForm, child: const Text('Cancelar'))), const SizedBox(width: 8), Expanded(child: FilledButton.icon(
                 onPressed: !_profileComplete ? null : _submit,
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
@@ -681,7 +800,9 @@ class _NuevaDenunciaScreenState extends State<NuevaDenunciaScreen> {
               if (!_profileComplete) ...[
                 const SizedBox(height: 8),
                 Text(
-                  'Para enviar la denuncia completa tu DNI y teléfono en tu perfil.',
+                  _missingProfileFields.isEmpty
+                      ? 'Para enviar la denuncia completa tu perfil.'
+                      : 'Para enviar la denuncia completa tu perfil: ${_missingProfileFields.join(', ')}.',
                   textAlign: TextAlign.center,
                   style: Theme.of(context)
                       .textTheme
@@ -809,18 +930,16 @@ class _PendingMediaTile extends StatelessWidget {
   }
 }
 
-String _mimeFromName(String filename, String mediaType) {
+String _normalizeMime(String? mimeType, String filename) {
+  final mime = (mimeType ?? '').toLowerCase().split(';').first.trim();
+  if (mime.isNotEmpty) return mime;
   final ext = filename.toLowerCase();
   if (ext.endsWith('.png')) return 'image/png';
-  if (ext.endsWith('.gif')) return 'image/gif';
   if (ext.endsWith('.webp')) return 'image/webp';
-  if (mediaType == 'image') return 'image/jpeg';
+  if (ext.endsWith('.jpg') || ext.endsWith('.jpeg')) return 'image/jpeg';
   if (ext.endsWith('.mov')) return 'video/quicktime';
-  if (ext.endsWith('.webm')) return 'video/webm';
-  if (ext.endsWith('.3gp')) return 'video/3gpp';
-  if (ext.endsWith('.m4v')) return 'video/x-m4v';
-  if (ext.endsWith('.avi')) return 'video/x-msvideo';
-  return 'video/mp4';
+  if (ext.endsWith('.mp4') || ext.endsWith('.m4v')) return 'video/mp4';
+  return '';
 }
 class _ComplaintSteps extends StatelessWidget {
   const _ComplaintSteps({required this.activeStep});

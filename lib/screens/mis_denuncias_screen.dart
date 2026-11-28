@@ -4,6 +4,7 @@ import '../theme/denupe_colors.dart';
 
 import '../models.dart';
 import '../services/app_scope.dart';
+import '../services/friendly_error.dart';
 import 'complaint_detail_screen.dart';
 
 class MisDenunciasScreen extends StatefulWidget {
@@ -19,6 +20,7 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
   List<Authority> _autoridades = [];
   final Set<String> _subscribed = {};
   bool _loading = true;
+  bool _isFuncionario = false;
   String _filter = 'Todas';
   String? _error;
 
@@ -33,7 +35,7 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
   void dispose() {
     notificationsTick.removeListener(_onTick);
     for (final id in _subscribed) {
-      realtime.unsubscribeComplaint(id);
+      realtime.unsubscribeComplaint(id, _onComplaintRealtime);
     }
     super.dispose();
   }
@@ -43,13 +45,15 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
     _load();
   }
 
+  void _onComplaintRealtime(_) {
+    if (!mounted) return;
+    _load();
+  }
+
   void _subscribeTo(List<Complaint> complaints) {
     for (final c in complaints) {
       if (_subscribed.add(c.id)) {
-        realtime.subscribeComplaint(c.id, (event) {
-          if (!mounted) return;
-          _load();
-        });
+        realtime.subscribeComplaint(c.id, _onComplaintRealtime);
       }
     }
   }
@@ -65,11 +69,16 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
         categories(),
         authorities(),
       ]);
+      Profile? profile;
+      try {
+        profile = await api.myProfile();
+      } catch (_) {}
       if (!mounted) return;
       setState(() {
         _complaints = results[0] as List<Complaint>;
         _cats = results[1] as List<Category>;
         _autoridades = results[2] as List<Authority>;
+        _isFuncionario = profile?.isFuncionario ?? _isFuncionario;
         _loading = false;
       });
       _subscribeTo(_complaints);
@@ -77,7 +86,7 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = friendlyError(e);
       });
     }
   }
@@ -88,6 +97,7 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
         builder: (_) => ComplaintDetailScreen(complaintId: complaint.id),
       ),
     );
+    if (!mounted) return;
     _load();
   }
 
@@ -150,10 +160,12 @@ class _MisDenunciasScreenState extends State<MisDenunciasScreen> {
                       onRetry: _load,
                     )
                   : _complaints.isEmpty
-                      ? const _StatusMessage(
+                      ? _StatusMessage(
                           icon: Icons.inbox_outlined,
-                          title: 'Aún no tienes denuncias',
-                          detail: 'Toca "Nueva" para reportar un problema en tu ciudad.',
+                          title: _isFuncionario ? 'No tienes denuncias registradas' : 'Aún no tienes denuncias',
+                          detail: _isFuncionario
+                              ? 'Cuando registres una denuncia como ciudadano, aparecerá aquí.'
+                              : 'Toca "Nueva" para reportar un problema en tu ciudad.',
                         )
                       : RefreshIndicator(
                           onRefresh: _load,
@@ -316,7 +328,10 @@ class _ComplaintThumbnailState extends State<_ComplaintThumbnail> {
       final media = await api.complaintMedia(widget.complaintId);
       for (final item in media) {
         if (item.isImage) {
-          return await api.complaintMediaSignedUrl(item.storageKey);
+          return await api.complaintMediaSignedUrl(
+            item.storageKey,
+            complaintId: widget.complaintId,
+          );
         }
       }
     } catch (_) {

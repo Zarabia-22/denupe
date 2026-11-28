@@ -196,7 +196,7 @@ void main() {
 
   group('contratos del servicio de IA', () {
     test('AiEntityService envía contexto territorial y procesa la sugerencia', () async {
-      dotenv.loadFromString(envString: 'DENUPE_IA_URL=https://api.example.test');
+      dotenv.loadFromString(envString: 'DENUPE_API_URL=https://api.example.test');
       final client = MockClient((request) async {
         expect(request.method, 'POST');
         expect(request.url.path, '/api/v1/ia/sugerir-entidad');

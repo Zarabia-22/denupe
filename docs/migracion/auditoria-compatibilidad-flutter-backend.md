@@ -1,25 +1,27 @@
 # Auditoría de compatibilidad: Flutter → Backend DenuPe en Render
 
-**Rama:** `feature/migracion-final-backend-r2`  
-**Base:** `develop`  
-**Estado:** cliente HTTP y módulos REST/R2 implementados en esta rama; CI de Flutter en corrección final. InsForge SDK/variables se conservan hasta regresión aprobada.
+> **Documento histórico.** Describe la migración ejecutada en la rama `feature/migracion-final-backend-r2`; ya no representa la configuración vigente del proyecto.
 
-## Objetivo y reglas
+- **Rama original:** `feature/migracion-final-backend-r2`
+- **Base:** `develop`
+- **Estado final:** migración completada. El cliente Flutter consume el backend FastAPI en Render, las evidencias en Cloudflare R2 mediante URLs prefirmadas y los servicios de IA mediante el proxy autenticado del backend. InsForge fue retirado del cliente y el tag `v1.6.0` fue publicado.
+
+## Objetivo y reglas originales
 
 La aplicación Flutter debe consumir el backend principal `https://denupe-backend.onrender.com` para autenticación, perfiles, catálogos, denuncias, historial, evidencias y notificaciones. Cloudflare R2 se consume exclusivamente mediante URLs prefirmadas emitidas por el backend.
 
-- Mantener InsForge activo e intacto durante toda la migración y el periodo de validación.
+- Mantener InsForge activo e intacto durante toda la migración y el periodo de validación (histórico; ya retirado del cliente).
 - No modificar `denupe-ia-backend`.
 - No publicar secretos ni incluir tokens/URLs prefirmadas en logs.
 - No cambiar la interfaz ni la lógica de negocio fuera del alcance de cada etapa.
 - No activar el cambio de backend en producción hasta completar pruebas de paridad y recuperación.
 
-## Hallazgos del cliente actual
+## Hallazgos del cliente durante la migración
 
-| Área | Implementación actual | Dependencia que debe retirarse |
+| Área | Implementación previa | Dependencia que debe retirarse |
 |---|---|---|
 | Arranque | `main.dart` carga configuración y llama `api.initialize()`; restaura JWT desde `flutter_secure_storage` y consulta `/auth/me`. | Inicialización del cliente HTTP y restauración del JWT desde almacenamiento seguro. |
-| Configuración | `config.dart` usa `DENUPE_API_URL` (fallback a backend Render); las claves InsForge se conservan temporalmente en `.env.example` hasta retirar dependencias tras regresión. | `DENUPE_API_BASE_URL`; IA se mantiene separada hasta completar su proxy. |
+| Configuración | `config.dart` usa `DENUPE_API_URL` (fallback a backend Render); las claves InsForge se conservaron temporalmente y ya no deben aparecer en `.env.example`. | `DENUPE_API_BASE_URL`; IA se mantiene separada hasta completar su proxy. |
 | Sesión | `DenupeApi` usa JWT Bearer, refresh token rotativo, secure storage y `authStateTick`. | Estado de sesión propio, JWT Bearer y consulta `GET /api/v1/auth/me`. |
 | Registro/verificación | `signUp`, envío y validación OTP mediante InsForge. | `DenupeApi` consume registro pendiente, OTP y verificación; el backend exige OTP solo a registros nuevos para preservar acceso de cuentas migradas. |
 | Recuperación | Inserta en `solicitudes_recuperacion`, envía código, intercambia token y cambia contraseña con InsForge. | `DenupeApi` consume solicitud/reenvío OTP, intercambio y cambio de contraseña; backend revoca refresh sessions tras el cambio. |
@@ -32,7 +34,7 @@ La aplicación Flutter debe consumir el backend principal `https://denupe-backen
 | Tiempo real | Socket.IO conectado a InsForge con `realtime:subscribe`. | Reemplazado por polling autenticado cada 20 segundos mediante el mismo cliente HTTP, con refresh automático. |
 | IA | Servicios Flutter consumen el proxy autenticado del backend principal para categoría, entidad y territorio. | Backend IA permanece intacto; Flutter ya consume proxies autenticados del backend principal para sugerir categoría, listar entidades, catálogo territorial y sugerir entidad. |
 
-## Incompatibilidades de contrato encontradas
+## Incompatibilidades de contrato encontradas durante la migración
 
 1. **Registro:** Flutter espera `requireEmailVerification` y flujo OTP. El backend `POST /auth/register` devuelve `user`, `access_token` y `token_type`, sin verificación de correo.
 2. **Recuperación:** el backend no publica endpoints de solicitud, validación de código ni cambio de contraseña.
@@ -66,12 +68,12 @@ La aplicación Flutter debe consumir el backend principal `https://denupe-backen
 - `lib/models.dart`
 - `lib/screens/login_screen.dart`, `register_screen.dart`, `new_complaint_screen.dart`, `complaint_detail_screen.dart`, `mis_denuncias_screen.dart`, `profile_screen.dart`, `notifications_screen.dart`, `panel_municipal_screen.dart`
 
-## Validación pendiente
+## Validación documental inicial
 
-Esta auditoría se basa en el código fuente y los contratos publicados en los repositorios. No se ha ejecutado Flutter, no se ha iniciado sesión con una cuenta real y no se ha realizado ninguna escritura contra datos productivos. Las pruebas en dispositivo se harán después de implementar cada etapa.
+Esta sección refleja el punto de partida histórico: la auditoría se basó en el código fuente y los contratos publicados, sin ejecutar Flutter, iniciar sesión con una cuenta real ni escribir en datos productivos.
 
 
-## Implementación realizada en esta rama (2026-11-27)
+## Implementación realizada durante la migración (2026-11-27)
 
 - Cliente HTTP único en `lib/services/denupe_api.dart`: manejo de errores, Bearer JWT, refresh token rotativo, secure storage, restauración de sesión y logout.
 - `main.dart`, `app.dart` y `app_scope.dart` conectados al estado de sesión propio; pantallas de login, registro, verificación, recuperación y perfil adaptadas a excepciones del backend.
@@ -79,16 +81,23 @@ Esta auditoría se basa en el código fuente y los contratos publicados en los r
 - Evidencias usan presigned PUT a R2, confirmación, URL firmada GET y eliminación.
 - Realtime sustituido por polling autenticado que comparte el cliente HTTP y renueva JWT cuando es necesario.
 - Admin se incluye en el panel de gestión.
-- InsForge SDK permanece declarado en dependencias/configuración como medida temporal; la inicialización funcional ya fue retirada de `main.dart`, pero no se borrará la dependencia hasta que el análisis, pruebas y regresión completa queden aprobados.
+- InsForge fue retirado del cliente: no se conservan SDK, variables ni referencias funcionales.
 
 ### Resultado de CI observado
 
-Flutter CI quedó aprobado: `flutter analyze --no-fatal-infos` y `flutter test` finalizaron correctamente en [run 45943132594](https://github.com/Zarabia-22/denupe/actions/runs/45943132594). La ejecución inicial había detectado errores de tipos y un import no usado; fueron corregidos antes de la ejecución aprobada.
+La ejecución histórica aprobada usó `flutter analyze --no-fatal-infos` y `flutter test` en [run 45943132594](https://github.com/Zarabia-22/denupe/actions/runs/45943132594). La configuración vigente ejecuta `flutter analyze`, `flutter test --coverage` y `flutter build web --release`.
 
-### Pendientes de validación
+## Estado final
 
-1. CI verde final en Flutter.
-2. SMTP real en Render y prueba de registro/verificación/recuperación.
-3. E2E del cliente Flutter en dispositivo: login, perfil, catálogos, crear denuncia, R2 foto/vídeo, descarga, eliminación, notificaciones y permisos de dos autoridades.
-4. Proxies de IA: implementar pruebas E2E contra el backend IA desplegado.
-5. Retirar InsForge SDK, claves y variables solo después de aprobar regresión integral y comprobar que el servicio IA conserva su dependencia independiente.
+- Backend principal FastAPI en Render para autenticación, perfiles, catálogos, denuncias, historial, adjuntos y notificaciones.
+- Cloudflare R2 privado con URLs prefirmadas; el cliente persiste `storage_key`.
+- Servicios de IA consumidos mediante el proxy autenticado del backend principal.
+- InsForge retirado del cliente; `insforge.toml` y `functions/` eliminados del repositorio.
+- Tag `v1.6.0` publicado.
+
+## Sigue abierto
+
+1. Verificación E2E en dispositivo: login, perfil, catálogos, crear denuncia, R2 foto/vídeo, descarga, eliminación, notificaciones y permisos de dos autoridades.
+2. Pruebas E2E de los proxies de IA contra el backend desplegado.
+3. Cobertura nacional efectiva de selección territorial y validación nominal de competencias.
+4. Capturas actualizadas y demo web estable, si se habilita un despliegue público.

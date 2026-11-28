@@ -38,7 +38,7 @@ DenuPe es una aplicación desarrollada con Flutter para facilitar el registro y 
 - **Código fuente:** [Zarabia-22/denupe](https://github.com/Zarabia-22/denupe).
 - **Backend de IA:** [Zarabia-22/denupe-ia-backend](https://github.com/Zarabia-22/denupe-ia-backend).
 
-El repositorio no contiene actualmente capturas de pantallas ni un GIF de demostración de la interfaz. Se muestra el logotipo del proyecto al inicio; las capturas del flujo de registro, creación y seguimiento de denuncias quedan pendientes de incorporar. No se publica aquí una URL de demo web porque no se ha verificado un despliegue público estable.
+El proyecto cuenta con la plataforma `web/` generada con Flutter y no contiene actualmente capturas de pantallas ni un GIF de demostración de la interfaz. Se muestra el logotipo del proyecto al inicio; las capturas del flujo de registro, creación y seguimiento de denuncias quedan pendientes de incorporar. No se publica aquí una URL de demo web porque no se ha verificado un despliegue público estable.
 
 ## Características principales
 
@@ -158,7 +158,10 @@ flutter pub get
 
 ```bash
 flutter run -d chrome
+flutter build web --release
 ```
+
+El resultado de la compilación web se genera en `build/web/`.
 
 **Android**
 
@@ -173,6 +176,10 @@ Si hay varios dispositivos conectados, utiliza el identificador mostrado por `fl
 flutter run -d <device_id>
 ```
 
+**iOS**
+
+Para generar releases iOS configura el equipo de desarrollo (`DEVELOPMENT_TEAM`) en Xcode o en la máquina de firma; el proyecto usa `Apple Distribution` únicamente en la configuración Release y no versiona credenciales de firma.
+
 ## Ejemplos de uso
 
 ### Ejecutar y validar el proyecto
@@ -186,6 +193,9 @@ flutter test
 
 # Ejecutar la aplicación en Chrome
 flutter run -d chrome
+
+# Generar la versión web de producción
+flutter build web --release
 
 # Generar APK de producción
 flutter build apk --release
@@ -211,18 +221,32 @@ Las operaciones de la aplicación se realizan bajo el prefijo `/api/v1`:
 | Método | Endpoint | Propósito |
 |---|---|---|
 | `POST` | `/auth/register` | Registrar una cuenta y solicitar verificación por correo. |
+| `POST` | `/auth/email/resend` | Reenviar el código OTP de verificación. |
 | `POST` | `/auth/email/verify` | Verificar el correo mediante OTP. |
 | `POST` | `/auth/login` | Iniciar sesión y obtener JWT. |
 | `POST` | `/auth/refresh` | Renovar la sesión mediante refresh token rotativo. |
+| `POST` | `/auth/logout` | Cerrar sesión y revocar la sesión activa. |
 | `GET/PATCH` | `/auth/me` | Consultar y actualizar el perfil propio. |
+| `POST` | `/auth/password-reset/request` | Solicitar un código de recuperación de contraseña. |
+| `POST` | `/auth/password-reset/resend` | Reenviar el código de recuperación. |
+| `POST` | `/auth/password-reset/exchange` | Intercambiar el código por un token de restablecimiento. |
+| `POST` | `/auth/password-reset/confirm` | Guardar la nueva contraseña con el token de restablecimiento. |
 | `GET` | `/catalogos/categorias` | Consultar categorías de denuncia. |
 | `GET` | `/catalogos/autoridades` | Consultar autoridades receptoras. |
+| `GET` | `/catalogos/distritos` | Consultar distritos disponibles. |
+| `GET` | `/catalogos/entidades` | Consultar entidades del catálogo. |
 | `GET` | `/denuncias` | Consultar denuncias permitidas para el usuario. |
 | `POST` | `/denuncias` | Registrar una denuncia. |
+| `GET` | `/denuncias/{id}` | Consultar el detalle de una denuncia. |
+| `PATCH` | `/denuncias/{id}/estado` | Actualizar el estado y registrar una nota opcional. |
+| `GET` | `/denuncias/{id}/historial` | Consultar el historial de estados de una denuncia. |
 | `POST` | `/denuncias/{id}/adjuntos/upload-url` | Solicitar autorización de carga a R2. |
 | `POST` | `/denuncias/{id}/adjuntos/confirm` | Confirmar y registrar una evidencia. |
+| `GET` | `/denuncias/{id}/adjuntos` | Listar las evidencias registradas. |
 | `GET` | `/denuncias/{id}/adjuntos/{attachment_id}/download-url` | Obtener una URL temporal de descarga. |
+| `DELETE` | `/denuncias/{id}/adjuntos/{attachment_id}` | Eliminar una evidencia y su objeto en R2. |
 | `GET` | `/notificaciones` | Consultar notificaciones del usuario. |
+| `PATCH` | `/notificaciones/{id}/leida` | Marcar una notificación como leída. |
 | `POST` | `/ia/sugerir-categoria` | Solicitar una categoría sugerida mediante el proxy autenticado de IA. |
 | `GET` | `/ia/entidades/disponibles` | Consultar opciones territoriales y entidades disponibles. |
 | `GET` | `/ia/territorio/catalogo-distrital` | Consultar el catálogo territorial. |
@@ -305,7 +329,7 @@ Backend principal FastAPI (Render)
       Cloudflare R2 privado
 
 Backend principal
-   |-- SMTP para verificación y recuperación
+   |-- Gmail API (OAuth 2.0 sobre HTTPS) para verificación y recuperación
    |-- Microservicio de IA para clasificación y resolución territorial
 
 Flutter consulta cambios de estado mediante sondeo REST autenticado.
@@ -324,9 +348,10 @@ Flutter consulta cambios de estado mediante sondeo REST autenticado.
 | `lib/theme/` | Colores y tema visual. |
 | `lib/widgets/` | Componentes reutilizables. |
 | `assets/` | Logotipos e imágenes. |
+| `web/` | Plataforma web generada con Flutter. |
 | `test/` | Pruebas automatizadas. |
 
-El esquema de base de datos y sus migraciones Alembic se mantienen en el repositorio del backend [denupe-backend](https://github.com/Zarabia-22/denupe-backend).
+El directorio `migrations/` de este repositorio es histórico y no se aplica en el despliegue de Render. El esquema y las migraciones vigentes se mantienen en el repositorio del backend [denupe-backend](https://github.com/Zarabia-22/denupe-backend).
 
 ### Catálogo territorial
 

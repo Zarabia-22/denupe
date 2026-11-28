@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../services/app_scope.dart';
+import '../services/friendly_error.dart';
 import 'profile_edit_screen.dart';
 
 /// Perfil del usuario autenticado: datos personales, rol y entidad.
@@ -25,6 +26,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() {
       _loading = true;
       _error = null;
@@ -41,7 +43,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = friendlyError(e);
       });
     }
   }
@@ -54,7 +56,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         builder: (_) => ProfileEditScreen(profile: profile),
       ),
     );
-    if (changed == true) _load();
+    if (!mounted) return;
+    if (changed == true) await _load();
   }
 
   @override
@@ -109,18 +112,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               label: 'Correo electrónico',
               value: email,
             ),
-          if (profile.dni != null && profile.dni!.isNotEmpty)
-            _InfoRow(
-              icon: Icons.badge_outlined,
-              label: 'DNI',
-              value: profile.dni!,
-            ),
-          if (profile.phone != null && profile.phone!.isNotEmpty)
-            _InfoRow(
-              icon: Icons.phone_outlined,
-              label: 'Teléfono',
-              value: profile.phone!,
-            ),
+          ..._buildRequiredRows(profile),
           if (profile.district != null && profile.district!.isNotEmpty)
             _InfoRow(
               icon: Icons.location_on_outlined,
@@ -211,6 +203,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
       ],
     );
   }
+
+  List<Widget> _buildRequiredRows(Profile profile) {
+    final missing = <String>[];
+    final dni = profile.dni?.trim() ?? '';
+    final phone = profile.phone?.trim() ?? '';
+    if (dni.isEmpty) missing.add('DNI');
+    if (phone.isEmpty) missing.add('Teléfono');
+    return [
+      _InfoRow(
+        icon: Icons.badge_outlined,
+        label: 'DNI',
+        value: dni.isEmpty ? 'Falta completar' : dni,
+        missing: dni.isEmpty,
+      ),
+      _InfoRow(
+        icon: Icons.phone_outlined,
+        label: 'Teléfono',
+        value: phone.isEmpty ? 'Falta completar' : phone,
+        missing: phone.isEmpty,
+      ),
+      if (missing.isNotEmpty)
+        Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 8),
+          child: Text(
+            'Falta completar para denunciar: ${missing.join(', ')}.',
+            style: TextStyle(color: Colors.orange.shade800, fontSize: 13),
+          ),
+        ),
+    ];
+  }
 }
 
 String _initials(String value) {
@@ -241,20 +263,23 @@ class _InfoRow extends StatelessWidget {
     required this.icon,
     required this.label,
     required this.value,
+    this.missing = false,
   });
 
   final IconData icon;
   final String label;
   final String value;
+  final bool missing;
 
   @override
   Widget build(BuildContext context) {
+    final color = missing ? Colors.orange.shade800 : null;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 20, color: Colors.grey.shade600),
+          Icon(icon, size: 20, color: missing ? Colors.orange.shade800 : Colors.grey.shade600),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -265,8 +290,11 @@ class _InfoRow extends StatelessWidget {
                         color: Colors.grey.shade600, fontSize: 12)),
                 const SizedBox(height: 2),
                 Text(value,
-                    style: const TextStyle(
-                        fontSize: 15, fontWeight: FontWeight.w500)),
+                    style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w500,
+                        color: color,
+                        fontStyle: missing ? FontStyle.italic : FontStyle.normal)),
               ],
             ),
           ),

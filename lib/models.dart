@@ -3,9 +3,20 @@
 import 'dart:typed_data';
 
 DateTime _parseDate(Object? value) {
-  if (value is String) return DateTime.tryParse(value)?.toLocal() ?? DateTime.now();
   if (value is DateTime) return value.toLocal();
-  throw const FormatException('Fecha inválida');
+  if (value is String) {
+    final parsed = DateTime.tryParse(value);
+    if (parsed != null) return parsed.toLocal();
+  }
+  return DateTime.fromMillisecondsSinceEpoch(0);
+}
+
+String? _firstText(Map<String, dynamic> json, List<String> keys) {
+  for (final key in keys) {
+    final value = json[key];
+    if (value != null && value.toString().isNotEmpty) return value.toString();
+  }
+  return null;
 }
 
 String _str(Map<String, dynamic> json, String key) {
@@ -119,6 +130,8 @@ class Complaint {
     this.denuncianteDni,
     this.denuncianteEmail,
     this.denuncianteTelefono,
+    this.districtUbigeo,
+    this.rutaTerritorialCode,
   });
 
   final String id;
@@ -140,6 +153,8 @@ class Complaint {
   final String? denuncianteDni;
   final String? denuncianteEmail;
   final String? denuncianteTelefono;
+  final String? districtUbigeo;
+  final String? rutaTerritorialCode;
 
   bool get hasDenuncianteData =>
       (denuncianteNombre?.trim().isNotEmpty ?? false) ||
@@ -155,8 +170,8 @@ class Complaint {
       userId: json['user_id'].toString(),
       categoryId: json['category_id']?.toString(),
       autoridadId: json['autoridad_id']?.toString(),
-      entidadPublicaId: json['entidad_publica_id']?.toString(),
-      entidadPublicaNombre: json['entidad_publica_nombre']?.toString(),
+      entidadPublicaId: _firstText(json, ['entidad_publica_id', 'entity_id']),
+      entidadPublicaNombre: _firstText(json, ['entidad_publica_nombre', 'entity_name']),
       title: _str(json, 'title'),
       description: _str(json, 'description'),
       address: json['address'] as String?,
@@ -170,6 +185,8 @@ class Complaint {
       denuncianteDni: json['denunciante_dni'] as String?,
       denuncianteEmail: json['denunciante_email'] as String?,
       denuncianteTelefono: json['denunciante_telefono'] as String?,
+      districtUbigeo: json['district_ubigeo']?.toString(),
+      rutaTerritorialCode: json['ruta_territorial_code']?.toString(),
     );
   }
 }
@@ -276,6 +293,18 @@ const Map<String, String> statusLabels = {
 };
 
 String statusLabel(String status) => statusLabels[status] ?? status;
+
+const Map<String, Set<String>> statusTransitions = {
+  'recibida': {'en_revision', 'rechazada', 'archivada'},
+  'en_revision': {'en_proceso', 'rechazada', 'archivada'},
+  'en_proceso': {'resuelta', 'rechazada', 'archivada'},
+  'resuelta': <String>{},
+  'rechazada': <String>{},
+  'archivada': <String>{},
+};
+
+bool canTransitionStatus(String from, String to) =>
+    statusTransitions[from]?.contains(to) ?? false;
 
 /// Adjunto pendiente de subir junto con la denuncia.
 class ComplaintAttachment {

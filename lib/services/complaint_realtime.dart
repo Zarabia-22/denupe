@@ -14,13 +14,12 @@ class StatusChangedEvent {
   final DateTime? updatedAt;
 }
 
-/// Seguimiento de cambios mediante sondeo autenticado del backend REST.
-/// Reutiliza DenupeApi para aprovechar la renovación de tokens JWT.
 class ComplaintRealtime {
   ComplaintRealtime(this._api);
 
   final DenupeApi _api;
   Timer? _timer;
+  bool _polling=false;
   final Map<String, List<void Function(StatusChangedEvent)>> _listeners = {};
   final Map<String, String> _lastStatus = {};
 
@@ -40,14 +39,24 @@ class ComplaintRealtime {
     _poll(id);
   }
 
-  void unsubscribeComplaint(String id) {
-    _listeners.remove(id);
-    _lastStatus.remove(id);
+  void unsubscribeComplaint(String id,[void Function(StatusChangedEvent)? listener]){
+    final list=_listeners[id];
+    if(list==null)return;
+    if(listener==null){_listeners.remove(id);_lastStatus.remove(id);return;}
+    final index=list.indexWhere((item)=>item==listener);
+    if(index>=0)list.removeAt(index);
+    if(list.isEmpty){_listeners.remove(id);_lastStatus.remove(id);}
   }
 
   Future<void> _pollAll() async {
-    for (final id in _listeners.keys.toList()) {
-      await _poll(id);
+    if(_polling)return;
+    _polling=true;
+    try{
+      for(final id in _listeners.keys.toList()){
+        await _poll(id);
+      }
+    }finally{
+      _polling=false;
     }
   }
 
@@ -65,12 +74,12 @@ class ComplaintRealtime {
           updatedAt: complaint.updatedAt,
         );
         for (final listener
-            in _listeners[id] ?? const <void Function(StatusChangedEvent)>[]) {
+            in List<void Function(StatusChangedEvent)>.from(_listeners[id] ?? const <void Function(StatusChangedEvent)>[])) {
           listener(event);
         }
       }
     } catch (_) {
-      // El sondeo siguiente reintentará sin interrumpir la interfaz.
+      return;
     }
   }
 

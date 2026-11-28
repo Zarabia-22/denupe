@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../models.dart';
 import '../services/app_scope.dart';
+import '../services/friendly_error.dart';
 import 'complaint_detail_screen.dart';
 
 /// Panel de trabajo del funcionario municipal: denuncias asignadas a su entidad.
@@ -32,7 +33,7 @@ class _PanelMunicipalScreenState extends State<PanelMunicipalScreen> {
   void dispose() {
     notificationsTick.removeListener(_onTick);
     for (final id in _subscribed) {
-      realtime.unsubscribeComplaint(id);
+      realtime.unsubscribeComplaint(id, _onComplaintRealtime);
     }
     super.dispose();
   }
@@ -42,13 +43,15 @@ class _PanelMunicipalScreenState extends State<PanelMunicipalScreen> {
     _load();
   }
 
+  void _onComplaintRealtime(_) {
+    if (!mounted) return;
+    _load();
+  }
+
   void _subscribeTo(List<Complaint> complaints) {
     for (final c in complaints) {
       if (_subscribed.add(c.id)) {
-        realtime.subscribeComplaint(c.id, (event) {
-          if (!mounted) return;
-          _load();
-        });
+        realtime.subscribeComplaint(c.id, _onComplaintRealtime);
       }
     }
   }
@@ -79,7 +82,7 @@ class _PanelMunicipalScreenState extends State<PanelMunicipalScreen> {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = e.toString();
+        _error = friendlyError(e);
       });
     }
   }
@@ -93,6 +96,7 @@ class _PanelMunicipalScreenState extends State<PanelMunicipalScreen> {
         ),
       ),
     );
+    if (!mounted) return;
     _load();
   }
 
@@ -141,7 +145,7 @@ class _PanelMunicipalScreenState extends State<PanelMunicipalScreen> {
               child: _StatusMessage(
                 icon: Icons.inbox_outlined,
                 title: 'No hay denuncias asignadas',
-                detail: 'Cuando un ciudadano reporte un problema de tu entidad, aparecerá aquí.',
+                detail: 'No hay denuncias pendientes para tu entidad en este momento.',
               ),
             )
           else

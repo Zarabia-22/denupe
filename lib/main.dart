@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
-
 import 'app.dart';
 import 'services/app_scope.dart';
+import 'services/friendly_error.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +24,7 @@ class _DenuPeBootstrapState extends State<DenuPeBootstrap> {
   late final Future<void> _init = _bootstrap();
 
   Future<void> _bootstrap() async {
-    await dotenv.load(fileName: '.env');
+    try { await dotenv.load(fileName: '.env'); } catch (_) {}
     await api.initialize();
   }
 
@@ -41,7 +41,7 @@ class _DenuPeBootstrapState extends State<DenuPeBootstrap> {
                 child: Padding(
                   padding: const EdgeInsets.all(24),
                   child: Text(
-                    'No se pudo iniciar la aplicación.\n\n${snapshot.error}',
+                    'No se pudo iniciar la aplicación.\n\n${friendlyError(snapshot.error ?? Object())}',
                     textAlign: TextAlign.center,
                   ),
                 ),

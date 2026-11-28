@@ -30,6 +30,10 @@
 	<string>DenuPe necesita acceso a tus fotos y videos para adjuntarlos a tus denuncias.</string>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>DenuPe necesita el micrófono para grabar videos de tus denuncias.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>DenuPe usa tu ubicación mientras usas la aplicación para registrar el lugar de la denuncia.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>DenuPe usa tu ubicación para registrar el lugar de la denuncia; no solicita seguimiento en segundo plano.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>

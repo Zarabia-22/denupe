@@ -8,6 +8,7 @@ import '../services/app_scope.dart';
 import '../services/denupe_api.dart';
 import '../services/ai_entity_service.dart';
 import '../services/entity_display_name.dart';
+import '../services/friendly_error.dart';
 
 class ComplaintConfirmationScreen extends StatefulWidget {
   const ComplaintConfirmationScreen({
@@ -42,8 +43,12 @@ class _ComplaintConfirmationScreenState
     extends State<ComplaintConfirmationScreen> {
   List<Authority> _autoridades = [];
   List<AiPublicEntity> _availableEntities = [];
+  String? _resolvedDepartment;
+  String? _resolvedProvince;
   String? _resolvedDistrict;
+  String? _resolvedDistrictUbigeo;
   AiPublicEntity? _selectedPublicEntity;
+  AiPublicEntity? _selectedTerritorialEntity;
   String? _selectedTerritorialCategoryCode;
   String _entitySearchQuery = '';
   bool _loadingEntities = false;
@@ -52,6 +57,9 @@ class _ComplaintConfirmationScreenState
   bool _confirming = false;
   bool _suggestingEntity = false;
   AiEntitySuggestion? _entitySuggestion;
+  Complaint? _createdComplaint;
+  int _failedAttachmentCount = 0;
+  List<ComplaintAttachment> _pendingFailedAttachments = [];
 
   @override
   void initState() {
@@ -98,21 +106,34 @@ class _ComplaintConfirmationScreenState
         longitud: widget.longitude!,
       );
       if (!mounted) return;
+      final first = entities.isNotEmpty ? entities.first : null;
+      final selectedTerritorial = _selectedTerritorialCategoryCode == null
+          ? null
+          : entities.where((e) => e.categoriaCode == _selectedTerritorialCategoryCode).cast<AiPublicEntity?>().firstWhere((_) => true, orElse: () => null);
+      final selectedPublic = _selectedPublicEntity == null
+          ? null
+          : entities.where((e) => e.id == _selectedPublicEntity!.id).cast<AiPublicEntity?>().firstWhere((_) => true, orElse: () => _selectedPublicEntity);
       setState(() {
         _availableEntities = entities;
-        _resolvedDistrict = entities.isEmpty
-            ? widget.district
-            : entities.first.ambito['distrito'] ?? widget.district;
+        _resolvedDepartment = first?.ambito['departamento'] ?? _resolvedDepartment;
+        _resolvedProvince = first?.ambito['provincia'] ?? _resolvedProvince;
+        _resolvedDistrict = first?.ambito['distrito'] ?? widget.district ?? _resolvedDistrict;
+        _resolvedDistrictUbigeo = first?.ubigeo ?? _resolvedDistrictUbigeo;
+        _selectedTerritorialEntity = selectedTerritorial ?? _selectedTerritorialEntity;
+        _selectedPublicEntity = selectedPublic;
         _entityCatalogError = null;
       });
     } on AiEntityException catch (e) {
       if (!mounted) return;
-      setState(() => _entityCatalogError = _dynamicEntityMessage(e.message));
+      setState(() {
+        _entityCatalogError = e.message;
+      });
       _showMessage(_entityCatalogError!);
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
-      setState(() => _entityCatalogError =
-          'No se pudo consultar el catálogo. Comprueba la conexión y vuelve a intentarlo.');
+      setState(() {
+        _entityCatalogError = friendlyError(e);
+      });
     } finally {
       if (mounted) setState(() => _loadingEntities = false);
     }
@@ -151,6 +172,19 @@ class _ComplaintConfirmationScreenState
     }
   }
 
+  bool _entityHasCompatibleAuthority(AiPublicEntity entity) {
+    if (entity.tipo == 'revision_competencia') return true;
+    final authorityType = _authorityTypeForEntity(entity.tipo);
+    if (authorityType == null) return false;
+    final authoritySigla = _authoritySiglaForEntity(entity.tipo);
+    return _autoridades.any(
+      (authority) =>
+          authority.tipo == authorityType &&
+          authority.isActive &&
+          (authoritySigla == null || authority.sigla == authoritySigla),
+    );
+  }
+
   void _selectPublicEntity(AiPublicEntity entity) {
     // Las opciones territoriales son rutas/categorías, no instituciones.
     // Se guardan por separado para no enviar el código de categoría como ID
@@ -158,6 +192,7 @@ class _ComplaintConfirmationScreenState
     if (entity.categoriaCode != null) {
       setState(() {
         _selectedTerritorialCategoryCode = entity.categoriaCode;
+        _selectedTerritorialEntity = entity;
         _selectedPublicEntity = null;
         _selectedAuthorityId = null;
         _entitySuggestion = null;
@@ -178,9 +213,16 @@ class _ComplaintConfirmationScreenState
         }
       }
     }
+    if (!_entityHasCompatibleAuthority(entity)) {
+      _showMessage(
+        'La opción sugerida no tiene una autoridad compatible disponible para esta denuncia.',
+      );
+      return;
+    }
     setState(() {
       _selectedPublicEntity = entity;
       _selectedTerritorialCategoryCode = null;
+      _selectedTerritorialEntity = null;
       _selectedAuthorityId = authority?.id;
       _entitySuggestion = null;
     });
@@ -203,13 +245,30 @@ class _ComplaintConfirmationScreenState
     return categoryNameFromCache(widget.categoryId);
   }
 
-
   String _districtFor(AiPublicEntity? entity) {
     final fromEntity = entity?.ambito['distrito']?.trim();
     if (fromEntity != null && fromEntity.isNotEmpty) return fromEntity;
     final resolved = _resolvedDistrict?.trim();
     if (resolved != null && resolved.isNotEmpty) return resolved;
     return widget.district?.trim() ?? '';
+  }
+
+  String _selectedDistrictUbigeo() {
+    final selectedPublic = _selectedPublicEntity?.ubigeo?.trim();
+    if (selectedPublic != null && selectedPublic.isNotEmpty) return selectedPublic;
+    final selectedTerritorial = _selectedTerritorialEntity?.ubigeo?.trim();
+    if (selectedTerritorial != null && selectedTerritorial.isNotEmpty) {
+      return selectedTerritorial;
+    }
+    for (final entity in _availableEntities) {
+      if (entity.categoriaCode == _selectedTerritorialCategoryCode) {
+        final ubigeo = entity.ubigeo?.trim();
+        if (ubigeo != null && ubigeo.isNotEmpty) return ubigeo;
+      }
+    }
+    final resolved = _resolvedDistrictUbigeo?.trim();
+    if (resolved != null && resolved.isNotEmpty) return resolved;
+    return '';
   }
 
   String _entityLabel(AiPublicEntity entity) => entityDisplayName(
@@ -235,63 +294,42 @@ class _ComplaintConfirmationScreenState
         : 'No encontramos una opción verificada en $place.';
   }
 
-  Map<String, String>? _territoryForDistrict(String? value) {
-    if (value == null || value.trim().isEmpty) return null;
-    String normalize(String text) => text.toLowerCase().trim()
-        .replaceAll(RegExp(r'[áàäâ]'), 'a')
-        .replaceAll(RegExp(r'[éèëê]'), 'e')
-        .replaceAll(RegExp(r'[íìïî]'), 'i')
-        .replaceAll(RegExp(r'[óòöô]'), 'o')
-        .replaceAll(RegExp(r'[úùüû]'), 'u')
-        .replaceAll('ñ', 'n')
-        .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-        .trim();
-
-    final district = normalize(value);
-    const callaoDistricts = {
-      'callao', 'bellavista', 'carmen de la legua reynoso',
-      'la perla', 'la punta', 'mi peru', 'ventanilla',
-    };
-    const limaDistricts = {
-      'lima', 'ancon', 'ate', 'barranco', 'brena', 'carabayllo',
-      'chaclacayo', 'chorrillos', 'cieneguilla', 'comas', 'el agustino',
-      'independencia', 'jesus maria', 'la molina', 'la victoria', 'lince',
-      'los olivos', 'lurigancho', 'lurin', 'magdalena del mar', 'miraflores',
-      'pachacamac', 'pucusana', 'pueblo libre', 'puente piedra',
-      'punta hermosa', 'punta negra', 'rimac', 'san bartolo', 'san borja',
-      'san isidro', 'san juan de lurigancho', 'san juan de miraflores',
-      'san luis', 'san martin de porres', 'san miguel', 'santa anita',
-      'santa maria del mar', 'santa rosa', 'santiago de surco', 'surquillo',
-      'villa el salvador', 'villa maria del triunfo',
-    };
-    if (callaoDistricts.contains(district)) {
-      return {'departamento': 'Callao', 'provincia': 'Callao'};
-    }
-    if (limaDistricts.contains(district)) {
-      return {'departamento': 'Lima', 'provincia': 'Lima'};
+  Map<String, String>? _resolvedTerritory() {
+    final dept = _resolvedDepartment?.trim();
+    final prov = _resolvedProvince?.trim();
+    final dist = (_resolvedDistrict ?? widget.district)?.trim();
+    if (dept != null && dept.isNotEmpty && prov != null && prov.isNotEmpty && dist != null && dist.isNotEmpty) {
+      return {'departamento': dept, 'provincia': prov, 'distrito': dist};
     }
     return null;
   }
 
+  Future<void> _ensureTerritoryResolved() async {
+    if (_resolvedTerritory() != null) return;
+    await _loadManualEntities();
+  }
+
   Future<void> _suggestEntity() async {
     if (_suggestingEntity || _confirming) return;
-    final territory = _territoryForDistrict(widget.district);
+    await _ensureTerritoryResolved();
+    final territory = _resolvedTerritory();
     if (territory == null) {
+      final hasDistrict = (_resolvedDistrict ?? widget.district)?.trim().isNotEmpty == true;
       _showMessage(
-        'Completa tu distrito en el perfil para ver las opciones disponibles cerca de ti.',
+        hasDistrict
+            ? 'No pudimos identificar el territorio completo de tu ubicación. Verifica el GPS e inténtalo de nuevo.'
+            : 'Necesitamos la ubicación GPS de la denuncia para identificar tu distrito y mostrar opciones.',
       );
       return;
     }
     setState(() => _suggestingEntity = true);
-    // Espera el catálogo local antes de decidir si la recomendación puede
-    // convertirse en uno de los tipos receptores que DenuPe almacena.
     if (_autoridades.isEmpty) {
       await _loadAutoridades();
     }
     if (!mounted) return;
+    final navigator = Navigator.of(context, rootNavigator: true);
     setState(() => _entitySuggestion = null);
 
-    // Mantiene el mismo diálogo de análisis utilizado por la sugerencia de categoría.
     showDialog<void>(
       context: context,
       barrierDismissible: false,
@@ -305,7 +343,7 @@ class _ComplaintConfirmationScreenState
         categoria: _categoryName(),
         departamento: territory['departamento']!,
         provincia: territory['provincia']!,
-        distrito: widget.district!.trim(),
+        distrito: territory['distrito']!,
         titulo: widget.title,
         descripcion: widget.description,
         latitud: widget.latitude,
@@ -313,17 +351,15 @@ class _ComplaintConfirmationScreenState
       );
     } on AiEntityException catch (e) {
       error = e.message;
-    } catch (_) {
-      error = 'No se pudo obtener la recomendación. Puedes elegir una opción manualmente.';
+    } catch (e) {
+      error = friendlyError(e);
     } finally {
-      if (mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-        setState(() => _suggestingEntity = false);
-      }
+      if (navigator.mounted) navigator.pop();
+      if (mounted) setState(() => _suggestingEntity = false);
     }
     if (!mounted) return;
     if (error != null) {
-      _showMessage(_dynamicEntityMessage(error));
+      _showMessage(error);
       return;
     }
     if (suggestion?.sugerida != true || suggestion?.entidad == null) {
@@ -344,8 +380,56 @@ class _ComplaintConfirmationScreenState
     }
   }
 
+  Future<List<ComplaintAttachment>> _uploadAttachments(
+    Complaint complaint,
+    List<ComplaintAttachment> attachments,
+  ) async {
+    final failed = <ComplaintAttachment>[];
+    for (final item in attachments) {
+      try {
+        await api.uploadComplaintMedia(
+          complaintId: complaint.id,
+          bytes: item.bytes,
+          filename: item.name,
+          contentType: item.contentType,
+          mediaType: item.mediaType,
+        );
+      } catch (_) {
+        failed.add(item);
+      }
+    }
+    return failed;
+  }
+
+  Future<void> _retryFailedAttachments() async {
+    final complaint = _createdComplaint;
+    if (complaint == null || _pendingFailedAttachments.isEmpty || _confirming) return;
+    setState(() => _confirming = true);
+    final failed = await _uploadAttachments(complaint, List<ComplaintAttachment>.of(_pendingFailedAttachments));
+    if (!mounted) return;
+    setState(() {
+      _confirming = false;
+      _pendingFailedAttachments = failed;
+      _failedAttachmentCount = failed.length;
+    });
+    if (failed.isEmpty) {
+      _showMessage('Todos los adjuntos se cargaron correctamente.');
+    } else {
+      _showMessage('Aún faltan ${failed.length} adjunto(s) por cargar.');
+    }
+  }
+
   Future<void> _confirm() async {
+    if (_createdComplaint != null) {
+      if (_pendingFailedAttachments.isNotEmpty) {
+        await _retryFailedAttachments();
+        return;
+      }
+      Navigator.of(context).pop(true);
+      return;
+    }
     final autoridad = _selectedAuthority;
+    final districtUbigeo = _selectedDistrictUbigeo();
     setState(() => _confirming = true);
     try {
       final complaint = await api.createComplaint(
@@ -355,38 +439,31 @@ class _ComplaintConfirmationScreenState
         address: widget.address,
         latitude: widget.latitude,
         longitude: widget.longitude,
-        // Se conserva el receptor interno y el identificador exacto de la institución.
-        // Si no hay selección, el trigger aplica la bandeja de revisión de competencia.
         autoridadId: autoridad?.id,
         entidadPublicaId: _selectedPublicEntity?.id,
-        entidadPublicaNombre: _selectedPublicEntity?.nombre,
+        entidadPublicaNombre: _selectedPublicEntity == null ? null : _entityLabel(_selectedPublicEntity!),
         rutaTerritorialCode: _selectedTerritorialCategoryCode,
+        districtUbigeo: districtUbigeo.isEmpty ? null : districtUbigeo,
       );
-      bumpNotificationsTick();
-      for (final item in widget.media) {
-        try {
-          await api.uploadComplaintMedia(
-            complaintId: complaint.id,
-            bytes: item.bytes,
-            filename: item.name,
-            contentType: item.contentType,
-            mediaType: item.mediaType,
-          );
-        } catch (_) {
-          if (!mounted) return;
-          _showMessage('"${item.name}" no se pudo adjuntar');
-        }
-      }
+      final failed = await _uploadAttachments(complaint, widget.media);
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      setState(() {
+        _confirming = false;
+        _createdComplaint = complaint;
+        _pendingFailedAttachments = failed;
+        _failedAttachmentCount = failed.length;
+      });
+      if (failed.isEmpty) {
+        Navigator.of(context).pop(true);
+      }
     } on DenupeApiException catch (e) {
       if (!mounted) return;
       setState(() => _confirming = false);
       _showMessage(e.message);
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
       setState(() => _confirming = false);
-      _showMessage('Error de conexión');
+      _showMessage(friendlyError(e));
     }
   }
 
@@ -428,9 +505,44 @@ class _ComplaintConfirmationScreenState
         const SizedBox(height: 16),
         _buildEntityCard(autoridad),
         const SizedBox(height: 12),
+        if (_createdComplaint != null && _failedAttachmentCount > 0) ...[
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: DenuPeColors.warning.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _failedAttachmentCount == 1
+                      ? 'La denuncia se registró, pero 1 adjunto no se pudo cargar.'
+                      : 'La denuncia se registró, pero $_failedAttachmentCount adjuntos no se pudieron cargar.',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+                const SizedBox(height: 6),
+                const Text('Puedes reintentar la carga ahora o abrir el detalle de la denuncia más tarde para revisarla.'),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    FilledButton.tonal(
+                      onPressed: _confirming ? null : _retryFailedAttachments,
+                      child: const Text('Reintentar adjuntos'),
+                    ),
+                    OutlinedButton(
+                      onPressed: _confirming ? null : () => Navigator.of(context).pop(true),
+                      child: const Text('Ir al detalle después'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(10)), child: Row(children: [const Icon(Icons.info_outline, color: DenuPeColors.primary), const SizedBox(width: 8), Expanded(child: Text('Al confirmar, tu denuncia se registrará con la opción elegida${_districtFor(null).isEmpty ? '' : ' para ${_districtFor(null)}'} o quedará en análisis interno si no hay una opción válida.'))])),
         const SizedBox(height: 16),
-        Row(children: [OutlinedButton(onPressed: _confirming ? null : () => Navigator.of(context).pop(), child: const Text('Editar')), const SizedBox(width: 8), Expanded(child: FilledButton.icon(
+        Row(children: [OutlinedButton(onPressed: _confirming ? null : () => Navigator.of(context).pop(_createdComplaint != null), child: Text(_createdComplaint != null ? 'Cerrar' : 'Editar')), const SizedBox(width: 8), Expanded(child: FilledButton.icon(
           onPressed: _confirming ? null : _confirm,
           style: FilledButton.styleFrom(
             padding: const EdgeInsets.symmetric(vertical: 16),
@@ -441,10 +553,10 @@ class _ComplaintConfirmationScreenState
                   height: 20,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : const Icon(Icons.check_circle_outline),
-          label: const Text('Confirmar denuncia'),
+              : Icon(_createdComplaint != null && _failedAttachmentCount == 0 ? Icons.check_circle_outline : Icons.check_circle_outline),
+          label: Text(_createdComplaint != null ? (_failedAttachmentCount > 0 ? 'Reintentar adjuntos' : 'Finalizar') : 'Confirmar denuncia'),
         ))]),
-        if (autoridad == null) ...[
+        if (autoridad == null && _selectedTerritorialCategoryCode == null) ...[
           const SizedBox(height: 8),
           Text(
             'Si no eliges una opción, DenuPe derivará la denuncia para análisis interno '
@@ -462,19 +574,7 @@ class _ComplaintConfirmationScreenState
 
   Widget _buildEntitySuggestionCard(AiEntitySuggestion suggestion) {
     final entity = suggestion.entidad;
-    final authorityType =
-        entity == null ? null : _authorityTypeForEntity(entity.tipo);
-    final authoritySigla =
-        entity == null ? null : _authoritySiglaForEntity(entity.tipo);
-    final canApply = suggestion.sugerida &&
-        entity != null &&
-        authorityType != null &&
-        _autoridades.any(
-          (authority) =>
-              authority.tipo == authorityType &&
-              authority.isActive &&
-              (authoritySigla == null || authority.sigla == authoritySigla),
-        );
+    final canApply = suggestion.sugerida && entity != null && _entityHasCompatibleAuthority(entity);
     final isApplied = _selectedPublicEntity?.id == entity?.id;
     final isReviewQueue = entity?.tipo == 'revision_competencia';
 
@@ -704,9 +804,9 @@ class _ComplaintConfirmationScreenState
                     '${widget.latitude!.toStringAsFixed(6)}, ${widget.longitude!.toStringAsFixed(6)}',
               ),
             const SizedBox(height: 12),
-            const Text('Ubicación', style: TextStyle(fontWeight: FontWeight.bold)),
+            Text('Ubicación', style: TextStyle(fontWeight: FontWeight.bold)),
             const SizedBox(height: 8),
-            LocationPreview(height: 112),
+            LocationPreview(height: 112, latitude: widget.latitude, longitude: widget.longitude),
             if (widget.latitude != null && widget.longitude != null)
               Padding(
                 padding: const EdgeInsets.only(top: 6),
@@ -747,15 +847,22 @@ class _ComplaintConfirmationScreenState
   }
 
   String _selectedTerritorialOptionName() {
+    final selected = _selectedTerritorialEntity;
+    if (selected != null) {
+      return _districtAwareEntityLabel(
+        selected.entidadReferencia,
+        district: selected.ambito['distrito'] ?? _resolvedDistrict ?? widget.district,
+      );
+    }
     for (final entity in _availableEntities) {
       if (entity.categoriaCode == _selectedTerritorialCategoryCode) {
         return _districtAwareEntityLabel(
           entity.entidadReferencia,
-          district: entity.ambito['distrito'] ?? widget.district,
+          district: entity.ambito['distrito'] ?? _resolvedDistrict ?? widget.district,
         );
       }
     }
-    return _districtAwareEntityLabel(null, district: widget.district);
+    return _districtAwareEntityLabel(null, district: _resolvedDistrict ?? widget.district);
   }
 
   Widget _buildEntityCard(Authority? autoridad) {
@@ -984,7 +1091,7 @@ class _ComplaintConfirmationScreenState
                         const SizedBox(width: 7),
                         Expanded(
                           child: Text(
-                            'Opción seleccionada: ${_selectedPublicEntity == null ? _selectedTerritorialOptionName() : _entityLabel(_selectedPublicEntity!)}',
+                            '${_selectedTerritorialCategoryCode != null ? 'Ruta seleccionada' : 'Opción seleccionada'}: ${_selectedPublicEntity == null ? _selectedTerritorialOptionName() : _entityLabel(_selectedPublicEntity!)}',
                             style: const TextStyle(
                               fontWeight: FontWeight.w600,
                               fontSize: 13,

@@ -8,14 +8,43 @@ import 'denupe_api.dart';
 final DenupeApi api = DenupeApi();
 final ComplaintRealtime realtime = ComplaintRealtime(api);
 
+const _catalogTtl = Duration(minutes: 5);
 List<Category>? _categoriesCache;
+List<Authority>? _authoritiesCache;
+DateTime? _categoriesAt, _authoritiesAt;
+String? _categoriesUser, _authoritiesUser;
+bool _catalogListenerAdded = false;
 
-/// Categorías, cacheadas la primera vez (se cargan en el backend).
+void _invalidateCatalogCaches() {
+  _categoriesCache = null;
+  _authoritiesCache = null;
+  _categoriesAt = null;
+  _authoritiesAt = null;
+  _categoriesUser = null;
+  _authoritiesUser = null;
+}
+
+void _ensureCatalogListener() {
+  if (_catalogListenerAdded) return;
+  _catalogListenerAdded = true;
+  api.authStateTick.addListener(_invalidateCatalogCaches);
+}
+
 Future<List<Category>> categories() async {
+  _ensureCatalogListener();
+  final user = api.currentUser?.id;
   final cached = _categoriesCache;
-  if (cached != null) return cached;
+  final at = _categoriesAt;
+  if (cached != null &&
+      at != null &&
+      _categoriesUser == user &&
+      DateTime.now().difference(at).compareTo(_catalogTtl) < 0) {
+    return cached;
+  }
   final value = await api.categories();
   _categoriesCache = value;
+  _categoriesAt = DateTime.now();
+  _categoriesUser = user;
   return value;
 }
 
@@ -34,14 +63,21 @@ String categoryNameFromCache(String? id) {
   return categoryNameOf(list, id);
 }
 
-List<Authority>? _authoritiesCache;
-
-/// Entidades receptoras, cacheadas la primera vez (se cargan en el backend).
 Future<List<Authority>> authorities() async {
+  _ensureCatalogListener();
+  final user = api.currentUser?.id;
   final cached = _authoritiesCache;
-  if (cached != null) return cached;
+  final at = _authoritiesAt;
+  if (cached != null &&
+      at != null &&
+      _authoritiesUser == user &&
+      DateTime.now().difference(at).compareTo(_catalogTtl) < 0) {
+    return cached;
+  }
   final value = await api.authorities();
   _authoritiesCache = value;
+  _authoritiesAt = DateTime.now();
+  _authoritiesUser = user;
   return value;
 }
 

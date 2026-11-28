@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../services/app_scope.dart';
 import '../services/denupe_api.dart';
+import '../services/friendly_error.dart';
 import '../theme/denupe_colors.dart';
 import 'register_screen.dart';
 
@@ -28,6 +31,13 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
+  Future<void> _openRegister() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => const RegisterScreen()),
+    );
+    if (!mounted) return;
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
@@ -41,11 +51,11 @@ class _LoginScreenState extends State<LoginScreen> {
     } on DenupeApiException catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(e.message)));
-    } catch (_) {
+          .showSnackBar(SnackBar(content: Text(friendlyError(e))));
+    } catch (error) {
       if (!mounted) return;
       ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('Error de conexión')));
+          .showSnackBar(SnackBar(content: Text(friendlyError(error))));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -111,8 +121,16 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       const SizedBox(height: 12),
                       Row(children: [
-                        Checkbox(value: _remember, activeColor: DenuPeColors.primary, onChanged: (v) => setState(() => _remember = v ?? true)),
-                        const Text('Recordarme', style: TextStyle(fontSize: 13)),
+                        Semantics(
+                          checked: _remember,
+                          label: 'Recordarme',
+                          child: ExcludeSemantics(
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              Checkbox(value: _remember, activeColor: DenuPeColors.primary, onChanged: (v) => setState(() => _remember = v ?? true)),
+                              const Text('Recordarme', style: TextStyle(fontSize: 13)),
+                            ]),
+                          ),
+                        ),
                         const Spacer(),
                         Flexible(child: TextButton(onPressed: _showRecoveryDialog, child: const Text('¿Olvidaste tu contraseña?', textAlign: TextAlign.end, style: TextStyle(fontSize: 12)))),
                       ]),
@@ -126,7 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(height: 30),
                       Row(mainAxisAlignment: MainAxisAlignment.center, children: [
                         const Text('¿No tienes una cuenta?', style: TextStyle(fontSize: 13)),
-                        TextButton(onPressed: _loading ? null : () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const RegisterScreen())), child: const Text('Crear cuenta')),
+                        TextButton(onPressed: _loading ? null : _openRegister, child: const Text('Crear cuenta')),
                       ]),
                     ])),
                   ),
@@ -166,6 +184,8 @@ class _PasswordRecoveryDialogState extends State<_PasswordRecoveryDialog> {
   int _step = 0;
   bool _loading = false;
   bool _showPassword = false;
+  int _resendSeconds = 0;
+  Timer? _resendTimer;
   String? _error;
   String _token = '';
 
@@ -186,6 +206,7 @@ class _PasswordRecoveryDialogState extends State<_PasswordRecoveryDialog> {
 
   @override
   void dispose() {
+    _resendTimer?.cancel();
     _email.dispose();
     _code.dispose();
     _password.dispose();
@@ -193,30 +214,55 @@ class _PasswordRecoveryDialogState extends State<_PasswordRecoveryDialog> {
     super.dispose();
   }
 
-  String _errorMessage(Object error) =>
-      error is DenupeApiException ? error.message : 'Error de conexión. Intenta nuevamente.';
+  void _startResendCooldown() {
+    _resendTimer?.cancel();
+    if (!mounted) return;
+    setState(() => _resendSeconds = 60);
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _resendSeconds = _resendSeconds > 0 ? _resendSeconds - 1 : 0;
+        if (_resendSeconds == 0) {
+          timer.cancel();
+          _resendTimer = null;
+        }
+      });
+    });
+  }
 
-  Future<void> _sendCode({bool stayOnStep = false}) async {
-    if (!stayOnStep && !_formKey.currentState!.validate()) return;
+  Future<void> _sendCode({bool resend = false}) async {
+    if (!resend && !_formKey.currentState!.validate()) return;
+    if (resend && (_loading || _resendSeconds > 0)) return;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
-      await api.requestPasswordReset(email: _email.text.trim());
+      if (resend) {
+        await api.resendPasswordResetCode(email: _email.text.trim());
+      } else {
+        await api.requestPasswordReset(email: _email.text.trim());
+      }
       if (!mounted) return;
       setState(() {
-        if (!stayOnStep) _step = 1;
+        if (!resend) _step = 1;
       });
+    } on DenupeApiException catch (e) {
+      if (!mounted) return;
+      setState(() => _error = friendlyError(e));
+      if (e.code == 'code_resend_too_soon') _startResendCooldown();
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = _errorMessage(error));
+      setState(() => _error = friendlyError(error));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
   }
 
-  Future<void> _resendCode() => _sendCode(stayOnStep: true);
+  Future<void> _resendCode() => _sendCode(resend: true);
 
   Future<void> _verifyCode() async {
     if (!_formKey.currentState!.validate()) return;
@@ -233,7 +279,7 @@ class _PasswordRecoveryDialogState extends State<_PasswordRecoveryDialog> {
       setState(() => _step = 2);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = _errorMessage(error));
+      setState(() => _error = friendlyError(error));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -254,7 +300,7 @@ class _PasswordRecoveryDialogState extends State<_PasswordRecoveryDialog> {
       setState(() => _step = 3);
     } catch (error) {
       if (!mounted) return;
-      setState(() => _error = _errorMessage(error));
+      setState(() => _error = friendlyError(error));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -307,6 +353,7 @@ class _PasswordRecoveryDialogState extends State<_PasswordRecoveryDialog> {
           TextFormField(
             controller: _code,
             autofocus: true,
+            autofillHints: const [AutofillHints.oneTimeCode],
             textAlign: TextAlign.center,
             keyboardType: TextInputType.number,
             maxLength: 6,
@@ -360,8 +407,10 @@ class _PasswordRecoveryDialogState extends State<_PasswordRecoveryDialog> {
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton(
-              onPressed: _loading ? null : _resendCode,
-              child: const Text('Reenviar código'),
+              onPressed: _loading || _resendSeconds > 0 ? null : _resendCode,
+              child: Text(_resendSeconds > 0
+                  ? 'Reenviar código ($_resendSeconds s)'
+                  : 'Reenviar código'),
             ),
           ),
         if (_error != null) ...[

@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import '../theme/denupe_colors.dart';
 
 import '../services/app_scope.dart';
-import '../services/denupe_api.dart';
+import '../services/friendly_error.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -26,6 +26,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _showPassword = false;
   bool _showConfirm = false;
   bool _accepted = false;
+
+  static final RegExp _emailValidator =
+      RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
 
   @override
   void dispose() {
@@ -56,10 +59,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         _showMessage('Cuenta creada');
         Navigator.of(context).pop();
       }
-    } on DenupeApiException catch (e) {
-      _showMessage(e.message);
-    } catch (_) {
-      _showMessage('Error de conexión');
+    } catch (error) {
+      _showMessage(friendlyError(error));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -75,10 +76,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
       // regresar a la raíz para que el menú principal quede visible.
       if (!mounted) return;
       setState(() => _verified = true);
-    } on DenupeApiException catch (e) {
-      _showMessage(e.message);
-    } catch (_) {
-      _showMessage('Error de conexión');
+    } catch (error) {
+      _showMessage(friendlyError(error));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -89,8 +88,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     try {
       await api.sendVerificationEmail(_email.text.trim());
       _showMessage('Código reenviado');
-    } on DenupeApiException catch (e) {
-      _showMessage(e.message);
+    } catch (error) {
+      _showMessage(friendlyError(error));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -101,6 +100,44 @@ class _RegisterScreenState extends State<RegisterScreen> {
     ScaffoldMessenger.of(context)
       ..removeCurrentSnackBar()
       ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _showTermsDialog() async {
+    await showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Términos de uso y privacidad'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text(
+                'DenuPe permite reportar incidencias ciudadanas y hacer seguimiento de tus denuncias. Al registrarte aceptas usar la aplicación de forma responsable y con información veraz.',
+                style: TextStyle(height: 1.4),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Tus datos de cuenta y los detalles de tus reportes se utilizan para gestionar las denuncias, notificarte cambios y mostrar el estado de cada caso.',
+                style: TextStyle(height: 1.4),
+              ),
+              SizedBox(height: 12),
+              Text(
+                'Evita incluir información sensible de terceros. Puedes solicitar la corrección o eliminación de tus datos personales a través del canal de atención del servicio.',
+                style: TextStyle(height: 1.4),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
   }
 
   @override
@@ -152,8 +189,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             keyboardType: TextInputType.emailAddress,
             autocorrect: false,
-            validator: (v) => (v == null || !v.contains('@'))
-                ? 'Ingresa un correo válido'
+            validator: (v) => (v == null || !_emailValidator.hasMatch(v.trim()))
+                ? 'Ingresa un correo electrónico válido'
                 : null,
           ),
           const SizedBox(height: 16),
@@ -179,7 +216,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
             validator: (v) =>
                 (v != _password.text) ? 'Las contraseñas no coinciden' : null,
           ),
-          CheckboxListTile(contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.leading, activeColor: DenuPeColors.primary, value: _accepted, onChanged: (v) => setState(() => _accepted = v ?? false), title: const Text('Acepto los términos de uso y la política de privacidad', style: TextStyle(fontSize: 13))),
+          CheckboxListTile(contentPadding: EdgeInsets.zero, controlAffinity: ListTileControlAffinity.leading, activeColor: DenuPeColors.primary, value: _accepted, onChanged: (v) => setState(() => _accepted = v ?? false), title: TextButton(
+            onPressed: _showTermsDialog,
+            style: TextButton.styleFrom(padding: EdgeInsets.zero, minimumSize: Size.zero, tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+            child: const Text('Acepto los términos de uso y la política de privacidad', textAlign: TextAlign.start, style: TextStyle(fontSize: 13, decoration: TextDecoration.underline)),
+          )),
           const SizedBox(height: 24),
           FilledButton(
             onPressed: (_loading || !_accepted) ? null : _submit,
@@ -207,11 +248,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     Text(subtitle, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, height: 1.5)),
   ]);
   Widget _buildVerification(ThemeData theme) => Form(key: _otpKey, child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-    _intro(Icons.mark_email_unread_outlined, 'Verifica tu correo', 'Hemos enviado un código de verificación a ' + _email.text.trim()),
+    _intro(Icons.mark_email_unread_outlined, 'Verifica tu correo', 'Hemos enviado un código de verificación a ${_email.text.trim()}'),
     const SizedBox(height: 24),
     const Text('Ingresa el código de 6 dígitos para completar tu registro.', textAlign: TextAlign.center),
     const SizedBox(height: 24),
-    TextFormField(controller: _otp, autofocus: true, textAlign: TextAlign.center, keyboardType: TextInputType.number, maxLength: 6, inputFormatters: [FilteringTextInputFormatter.digitsOnly], style: const TextStyle(fontSize: 26, letterSpacing: 10, fontWeight: FontWeight.bold), decoration: const InputDecoration(hintText: '••••••', counterText: '', border: OutlineInputBorder()), validator: (v) => v == null || v.length != 6 ? 'Ingresa los 6 dígitos' : null),
+    TextFormField(controller: _otp, autofocus: true, autofillHints: const [AutofillHints.oneTimeCode], textAlign: TextAlign.center, keyboardType: TextInputType.number, maxLength: 6, inputFormatters: [FilteringTextInputFormatter.digitsOnly], style: const TextStyle(fontSize: 26, letterSpacing: 10, fontWeight: FontWeight.bold), decoration: const InputDecoration(hintText: '••••••', counterText: '', border: OutlineInputBorder()), validator: (v) => v == null || v.length != 6 ? 'Ingresa los 6 dígitos' : null),
     const SizedBox(height: 18),
     const Text('¿No recibiste el código?', textAlign: TextAlign.center),
     TextButton(onPressed: _loading ? null : _resendCode, child: const Text('Reenviar código')),

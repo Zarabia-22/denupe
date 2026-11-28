@@ -3,9 +3,9 @@ import '../services/app_scope.dart';
 import '../services/denupe_api.dart';
 
 class AiPublicEntity {
-  const AiPublicEntity({required this.id,required this.nombre,required this.tipo,required this.ambito,this.direccion,this.telefono,this.sitioWeb,this.entidadReferencia,this.metodoResolucion,this.categoriaCode});
+  const AiPublicEntity({required this.id,required this.nombre,required this.tipo,required this.ambito,this.direccion,this.telefono,this.sitioWeb,this.entidadReferencia,this.metodoResolucion,this.categoriaCode,this.ubigeo});
   final String id,nombre,tipo;
-  final String? direccion,telefono,sitioWeb;
+  final String? direccion,telefono,sitioWeb,ubigeo;
   final Map<String,String> ambito;
   final String? entidadReferencia,metodoResolucion,categoriaCode;
   factory AiPublicEntity.fromJson(Map<String,dynamic> json){
@@ -17,6 +17,7 @@ class AiPublicEntity {
       telefono:json['telefono'] as String?,sitioWeb:json['sitio_web'] as String?,
       ambito:area,entidadReferencia:json['entidad_referencia']?.toString(),
       metodoResolucion:json['metodo_resolucion']?.toString(),categoriaCode:json['categoria_code']?.toString(),
+      ubigeo:json['ubigeo']?.toString() ?? json['district_ubigeo']?.toString(),
     );
   }
 }
@@ -68,11 +69,13 @@ class AiEntityService {
       return rows.whereType<Map>().map((raw){
         final item=Map<String,dynamic>.from(raw);
         final code=item['categoria_code']?.toString()??'';
+        final ubigeo=item['ubigeo']?.toString() ?? item['district_ubigeo']?.toString() ?? data['ubigeo']?.toString();
         return AiPublicEntity(
           id:code,nombre:names[code]??(code.isEmpty?'Categoría':code),
           tipo:item['entidad_tipo']?.toString()??'',ambito:area,
           entidadReferencia:item['entidad_nombre']?.toString(),
           metodoResolucion:item['metodo_resolucion']?.toString(),categoriaCode:code,
+          ubigeo:ubigeo,
         );
       }).where((x)=>x.id.isNotEmpty).toList();
     } on DenupeApiException catch(e){throw AiEntityException(e.message);}

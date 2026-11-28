@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [develop, main]
   push:
-    branches: [main, develop, feature/migracion-final-backend-r2]
+    branches: [main, develop, 'fix/**', 'release/**']
 
 permissions:
   contents: read
@@ -34,10 +34,13 @@ jobs:
         run: flutter pub get
 
       - name: Analyze
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze
 
       - name: Run tests
-        run: flutter test
+        run: flutter test --coverage
+
+      - name: Build web release
+        run: flutter build web --release
 
       - name: Build Android debug APK
         run: flutter build apk --debug

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../services/app_scope.dart';
+import '../services/friendly_error.dart';
 import '../theme/denupe_colors.dart';
 import 'mis_denuncias_screen.dart';
 import 'new_complaint_screen.dart';
@@ -18,7 +19,9 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _index = 1;
   int _notificationsTick = 0;
+  int _unreadNotifications = 0;
   bool _isStaff = false;
+  bool _profileError = false;
 
   @override
   void initState() {
@@ -26,9 +29,11 @@ class _HomeScreenState extends State<HomeScreen> {
     realtime.connect();
     notificationsTick.addListener(_onNotificationsTick);
     _loadProfile();
+    _refreshUnreadNotifications();
   }
 
   Future<void> _loadProfile() async {
+    if (_profileError && mounted) setState(() => _profileError = false);
     try {
       final profile = await api.myProfile();
       if (!mounted) return;
@@ -37,13 +42,23 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!_isStaff && _index > 3) _index = 1;
       });
     } catch (_) {
-      // Sin rol conocido: no se muestra el panel.
+      if (!mounted) return;
+      setState(() => _profileError = true);
     }
   }
 
   void _onNotificationsTick() {
     if (!mounted) return;
     setState(() => _notificationsTick = notificationsTick.value);
+    _refreshUnreadNotifications();
+  }
+
+  Future<void> _refreshUnreadNotifications() async {
+    try {
+      final count = await api.unreadNotificationsCount();
+      if (!mounted) return;
+      setState(() => _unreadNotifications = count);
+    } catch (_) {}
   }
 
   @override
@@ -75,10 +90,11 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       await api.signOut();
       // AuthGate regresa a login vía onAuthStateChange.
-    } catch (_) {
+    } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('No se pudo cerrar sesión')));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Sesión cerrada en este dispositivo. ${friendlyError(e)}')),
+      );
     }
   }
 
@@ -95,15 +111,36 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: IndexedStack(
-        index: _index,
+      body: Column(
         children: [
-          if (!_isStaff)
-            NuevaDenunciaScreen(onCreated: () => setState(() => _index = 1)),
-          const MisDenunciasScreen(),
-          if (_isStaff) const PanelMunicipalScreen(),
-          NotificacionesScreen(tick: _notificationsTick),
-          const ProfileScreen(),
+          if (_profileError)
+            Container(
+              width: double.infinity,
+              color: const Color(0xFFFFF3CD),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                children: [
+                  const Expanded(child: Text('No se pudo cargar tu perfil.')),
+                  TextButton(
+                    onPressed: _loadProfile,
+                    child: const Text('Reintentar'),
+                  ),
+                ],
+              ),
+            ),
+          Expanded(
+            child: IndexedStack(
+              index: _index,
+              children: [
+                if (!_isStaff)
+                  NuevaDenunciaScreen(onCreated: () => setState(() => _index = 1)),
+                const MisDenunciasScreen(),
+                if (_isStaff) const PanelMunicipalScreen(),
+                NotificacionesScreen(tick: _notificationsTick),
+                const ProfileScreen(),
+              ],
+            ),
+          ),
         ],
       ),
       bottomNavigationBar: NavigationBar(
@@ -130,9 +167,17 @@ class _HomeScreenState extends State<HomeScreen> {
               selectedIcon: Icon(Icons.badge),
               label: 'Panel',
             ),
-          const NavigationDestination(
-            icon: Icon(Icons.notifications_outlined),
-            selectedIcon: Icon(Icons.notifications),
+          NavigationDestination(
+            icon: Badge(
+              isLabelVisible: _unreadNotifications > 0,
+              label: Text(_unreadNotifications > 99 ? '99+' : '$_unreadNotifications'),
+              child: const Icon(Icons.notifications_outlined),
+            ),
+            selectedIcon: Badge(
+              isLabelVisible: _unreadNotifications > 0,
+              label: Text(_unreadNotifications > 99 ? '99+' : '$_unreadNotifications'),
+              child: const Icon(Icons.notifications),
+            ),
             label: 'Notificaciones',
           ),
           const NavigationDestination(
