@@ -51,6 +51,8 @@ def find_value(value, keys):
 
 def run():
     global TOKEN, COMPLAINT_ID
+    if not SECOND_EMAIL or not SECOND_PASSWORD:
+        raise AssertionError("Configura DENUPE_TEST_SECOND_EMAIL y DENUPE_TEST_SECOND_PASSWORD para validar el aislamiento entre usuarios.")
     h = S.get(BASE + "/health", timeout=45)
     if h.status_code != 200: raise AssertionError(f"API health HTTP {h.status_code}: {h.text[:300]}")
     record("API disponible", True, BASE)
@@ -116,8 +118,10 @@ def run():
 
     invalid = call("POST", "/denuncias", json={**payload, "title": "abc", "description": "corta"}, expected=(422,))
     record("Regla: rechazar campos obligatorios inválidos", invalid.status_code == 422, "HTTP 422")
+    invalid_category = call("POST", "/denuncias", json={**payload, "category_id": str(uuid.uuid4())}, expected=(422,))
+    record("Regla: rechazar categoría inexistente", invalid_category.status_code == 422, "HTTP 422")
 
-    created = body(call("POST", "/denuncias", json=payload))
+    created = body(call("POST", "/denuncias", json=payload, expected=(201,)))
     COMPLAINT_ID = str(created.get("id") or "")
     if not COMPLAINT_ID: raise AssertionError("La creación no devolvió ID: " + str(created)[:500])
     record("Crear denuncia ficticia", created.get("status") == "recibida",
